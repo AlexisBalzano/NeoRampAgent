@@ -63,7 +63,6 @@ namespace rampAgent {
     public:
         // Command IDs
         std::string versionId_;
-		std::string reportId_; // FIXME: debug command
 
     private:
         // Plugin state

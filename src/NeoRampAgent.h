@@ -50,11 +50,11 @@ namespace rampAgent {
     private:
         void runScopeUpdate();
         void run();
-        void sendReport();
+        //void sendReport();
 
     public:
         // Command IDs
-        std::string commandId_;
+        std::string versionId_;
 
     private:
         // Plugin state

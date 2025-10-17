@@ -120,6 +120,15 @@ void NeoRampAgent::DisplayMessage(const std::string &message, const std::string 
     chatAPI_->sendClientMessage(textMessage);
 }
 
+void NeoRampAgent::run() {
+    int counter = 0;
+    while (!this->m_stop) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        counter++;
+        OnTimer(counter);
+    }
+}
+
 void NeoRampAgent::runScopeUpdate() {
     UpdateTagItems();
 }
@@ -130,5 +139,5 @@ void NeoRampAgent::OnTimer(int Counter) {
 
 PluginSDK::PluginMetadata NeoRampAgent::GetMetadata() const
 {
-    return {"NeoRampAgent", PLUGIN_VERSION, "PLUGIN_AUTHOR"};
+    return {"NeoRampAgent", PLUGIN_VERSION, "French vACC"};
 }

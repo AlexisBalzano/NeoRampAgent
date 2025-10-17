@@ -48,23 +48,23 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
     {
         return;
     }
-    std::optional<DataManager::Pilot> pilot = dataManager_->getPilotByCallsign(event->callsign); //FIXME:
-    if (!pilot || pilot->empty()) return;
+    //std::optional<DataManager::Pilot> pilot = dataManager_->getPilotByCallsign(event->callsign); //FIXME:
+    //if (!pilot || pilot->empty()) return;
 
-    if (event->componentId == "None")
-    {
-        if (!pilot->stand.empty())
-        {
-            dataManager_->freeStand(pilot->stand);
-            pilot->stand.clear();
-            dataManager_->updatePilotStand(pilot->callsign, pilot->stand);
-            UpdateTagItems(pilot->callsign);
-        }
-        return;
-    }
+    //if (event->componentId == "None")
+    //{
+    //    if (!pilot->stand.empty())
+    //    {
+    //        dataManager_->freeStand(pilot->stand);
+    //        pilot->stand.clear();
+    //        dataManager_->updatePilotStand(pilot->callsign, pilot->stand);
+    //        UpdateTagItems(pilot->callsign);
+    //    }
+    //    return;
+    //}
 
-    dataManager_->assignStandToPilot(pilot->callsign, event->componentId);
-    UpdateTagItems(pilot->callsign);
+    //dataManager_->assignStandToPilot(pilot->callsign, event->componentId);
+    //UpdateTagItems(pilot->callsign);
 
 }
 
@@ -74,43 +74,43 @@ void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string 
 
 inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao)
 {
-    std::vector<DataManager::Stand> stands = dataManager_->getAvailableStandsForAirport(icao); //FIXME:
+    //std::vector<DataManager::Stand> stands = dataManager_->getAvailableStandsForAirport(icao); //FIXME:
 
-    PluginSDK::Tag::DropdownDefinition dropdownDef;
-    dropdownDef.title = "STAND";
-    dropdownDef.width = 75;
-    dropdownDef.maxHeight = 150;
+    //PluginSDK::Tag::DropdownDefinition dropdownDef;
+    //dropdownDef.title = "STAND";
+    //dropdownDef.width = 75;
+    //dropdownDef.maxHeight = 150;
 
-    PluginSDK::Tag::DropdownComponent scrollArea;
-    scrollArea.id = "SCROLL";
-    scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
-
-
-    PluginSDK::Tag::DropdownComponent dropdownComponent;
-    PluginSDK::Tag::DropdownComponentStyle style;
-
-    style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
-
-    dropdownComponent.id = "None";
-    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-    dropdownComponent.text = "None";
-    dropdownComponent.requiresInput = false;
-    dropdownComponent.style = style;
-    scrollArea.children.push_back(dropdownComponent);
+    //PluginSDK::Tag::DropdownComponent scrollArea;
+    //scrollArea.id = "SCROLL";
+    //scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
 
 
-    for (const auto& stand : stands) {
-        dropdownComponent.id = stand.name;
-        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-        dropdownComponent.text = stand.name;
-        dropdownComponent.requiresInput = false;
-        dropdownComponent.style = style;
-        scrollArea.children.push_back(dropdownComponent);
-    }
+    //PluginSDK::Tag::DropdownComponent dropdownComponent;
+    //PluginSDK::Tag::DropdownComponentStyle style;
 
-    dropdownDef.components.push_back(scrollArea);
+    //style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
-    tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
+    //dropdownComponent.id = "None";
+    //dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+    //dropdownComponent.text = "None";
+    //dropdownComponent.requiresInput = false;
+    //dropdownComponent.style = style;
+    //scrollArea.children.push_back(dropdownComponent);
+
+
+    //for (const auto& stand : stands) {
+    //    dropdownComponent.id = stand.name;
+    //    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+    //    dropdownComponent.text = stand.name;
+    //    dropdownComponent.requiresInput = false;
+    //    dropdownComponent.style = style;
+    //    scrollArea.children.push_back(dropdownComponent);
+    //}
+
+    //dropdownDef.components.push_back(scrollArea);
+
+    //tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
 }
 
 }  // namespace rampAgent

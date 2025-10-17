@@ -4,7 +4,7 @@ extern "C" PLUGIN_API PluginSDK::BasePlugin *CreatePluginInstance()
 {
     try
     {
-        return new ramp::NeoRampAgent();
+        return new rampAgent::NeoRampAgent();
     }
     catch (const std::exception &e)
     {

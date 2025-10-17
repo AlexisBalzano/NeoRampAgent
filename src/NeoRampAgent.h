@@ -60,6 +60,7 @@ namespace rampAgent {
         void runScopeUpdate();
         void run();
 		std::string toUpper(std::string str);
+		bool isConnected();
         bool isController();
         void sortStandList(std::vector<Stand>& standList);
 
@@ -80,6 +81,7 @@ namespace rampAgent {
         bool initialized_ = false;
         std::thread m_worker;
 		bool canSendReport_ = false;
+        bool isConnected_ = false;
         bool m_stop;
 
         // APIs

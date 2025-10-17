@@ -48,6 +48,7 @@ void NeoRampAgent::Initialize(const PluginMetadata &metadata, CoreAPI *coreAPI, 
         this->RegisterCommand();
 
         initialized_ = true;
+        isConnected_ = isConnected();
 		canSendReport_ = isController();
 		LOG_DEBUG(Logger::LogLevel::Info, "NeoRampAgent initialized successfully");
     }
@@ -136,6 +137,15 @@ std::string rampAgent::NeoRampAgent::toUpper(std::string str)
 	return str;
 }
 
+bool rampAgent::NeoRampAgent::isConnected()
+{
+    std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
+    if (connectionInfo.has_value() && connectionInfo->isConnected) {
+		return true;
+    }
+	return false;
+}
+
 bool rampAgent::NeoRampAgent::isController()
 {
 #ifdef DEV
@@ -143,7 +153,7 @@ bool rampAgent::NeoRampAgent::isController()
 #endif // DEV
 
 	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
-    if (connectionInfo.has_value() && connectionInfo->isConnected) {
+    if (isConnected_) {
         if (connectionInfo->facility >= Fsd::NetworkFacility::DEL) {
             return true;
         }
@@ -401,11 +411,12 @@ void NeoRampAgent::runScopeUpdate() {
 void rampAgent::NeoRampAgent::OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event)
 {
 	// recheck connection status to determine if we can send reports
-	canSendReport_ = isController();
+	isConnected_ = isConnected();
+    canSendReport_ = isController();
 }
 
 void NeoRampAgent::OnTimer(int Counter) {
-    if (Counter % 10 == 0) this->runScopeUpdate();
+    if (Counter % 10 == 0 && isConnected_) this->runScopeUpdate();
 }
 
 PluginSDK::PluginMetadata NeoRampAgent::GetMetadata() const

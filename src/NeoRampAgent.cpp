@@ -144,7 +144,7 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
     // Filter for ground aircraft
     std::vector<Aircraft::Aircraft> groundAircrafts;
     for (const auto& ac : aircrafts) {
-        if (ac.position.onGround) {
+        if (ac.position.onGround && ac.position.groundSpeed == 0) {
             groundAircrafts.push_back(ac);
         }
     }
@@ -152,7 +152,7 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
     // Filter for airborn aircraft
     std::vector<Aircraft::Aircraft> airbornAircrafts;
     for (const auto& ac : aircrafts) {
-        if (!ac.position.onGround) {
+        if (!ac.position.onGround || ac.position.groundSpeed != 0) {
             std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
             if (!fp.has_value()) continue; // Skip if no flightplan found
             airbornAircrafts.push_back(ac);
@@ -168,9 +168,10 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
     std::string currentATC = connectionInfo->callsign;
 
     reportJson["client"] = currentATC;
+	reportJson["aircrafts"]["onGround"] = nlohmann::ordered_json::object();
+	reportJson["aircrafts"]["airborne"] = nlohmann::ordered_json::object();
 
     for (const auto& ac : groundAircrafts) {
-        nlohmann::ordered_json acJson;
         std::string callsign = toUpper(ac.callsign);
         std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
         std::string origin = "N/A";
@@ -180,15 +181,13 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
             aircraftType = toUpper(fp->acType);
         }
 
-        acJson[callsign]["origin"] = origin;
-        acJson[callsign]["aircraftType"] = aircraftType;
-        acJson[callsign]["position"]["lat"] = ac.position.latitude;
-        acJson[callsign]["position"]["lon"] = ac.position.longitude;
-        reportJson["aircrafts"]["onGround"].push_back(acJson);
+        reportJson["aircrafts"]["onGround"][callsign]["origin"] = origin;
+        reportJson["aircrafts"]["onGround"][callsign]["aircraftType"] = aircraftType;
+        reportJson["aircrafts"]["onGround"][callsign]["position"]["lat"] = ac.position.latitude;
+        reportJson["aircrafts"]["onGround"][callsign]["position"]["lon"] = ac.position.longitude;
     }
 
     for (const auto& ac : airbornAircrafts) {
-        nlohmann::ordered_json acJson;
         std::string callsign = toUpper(ac.callsign);
         std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
         std::string origin = "N/A";
@@ -203,43 +202,52 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
         std::optional<double> distOpt = aircraftAPI_->getDistanceToDestination(ac.callsign);
         double dist = distOpt.value_or(-1);
 
-        acJson[callsign]["origin"] = origin;
-        acJson[callsign]["destination"] = destination;
-        acJson[callsign]["aircraftType"] = aircraftType;
-        acJson[callsign]["position"]["lat"] = ac.position.latitude;
-        acJson[callsign]["position"]["lon"] = ac.position.longitude;
-        acJson[callsign]["position"]["alt"] = ac.position.altitude;
-        acJson[callsign]["position"]["dist"] = dist;
-        reportJson["aircrafts"]["airborne"].push_back(acJson);
+        reportJson["aircrafts"]["airborne"][callsign]["origin"] = origin;
+        reportJson["aircrafts"]["airborne"][callsign]["destination"] = destination;
+        reportJson["aircrafts"]["airborne"][callsign]["aircraftType"] = aircraftType;
+        reportJson["aircrafts"]["airborne"][callsign]["position"]["lat"] = ac.position.latitude;
+        reportJson["aircrafts"]["airborne"][callsign]["position"]["lon"] = ac.position.longitude;
+        reportJson["aircrafts"]["airborne"][callsign]["position"]["alt"] = ac.position.altitude;
+        reportJson["aircrafts"]["airborne"][callsign]["position"]["dist"] = dist;
     }
-
-    std::string reportStr = reportJson.dump();
-    logger_->log(Logger::LogLevel::Info, "RampAgent Report: " + reportStr);
 }
 
 void rampAgent::NeoRampAgent::sendReport()
 {
-	nlohmann::ordered_json reportJson;
+    nlohmann::ordered_json reportJson;
     generateReport(reportJson);
 
- //   httplib::SSLClient cli("neorampagent.alexisbalzano.fr");
- //   httplib::Headers headers = { {"User-Agent", "NeoRampAgentReportSender"}, {"Content-Type", "application/json"} };
- //   std::string apiEndpoint = "/api/v1/report";
- //   auto res = cli.Post(apiEndpoint.c_str(), headers, reportJson.dump(), "application/json");
- //   if (res && res->status == 200) {
- //       logger_->log(Logger::LogLevel::Info, "Report sent successfully to NeoRampAgent server.");
- //   }
- //   else {
- //       logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
-	//}
+    if (reportJson.empty()) {
+        logger_->log(Logger::LogLevel::Info, "Skipping report: no data to send.");
+        return;
+    }
+
+    // HTTP (no TLS) to localhost:3000
+    httplib::Client cli("127.0.0.1", 3000);
+    cli.set_connection_timeout(2); // seconds
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    
+    auto res = cli.Post("/report", reportJson.dump(), "application/json");
+
+    if (res && res->status >= 200 && res->status < 300) {
+		//Use response to update tags/return response
+    } else {
+        logger_->error(
+            "Failed to send report to NeoRampAgent server. HTTP status: " +
+            std::to_string(res ? res->status : 0) +
+            " (no detailed error available with this httplib version)"
+        );
+    }
 }
 
 void NeoRampAgent::runScopeUpdate() {
-    UpdateTagItems();
+	sendReport(); // Use response to update tags
+    //UpdateTagItems(); //FIXME:
 }
 
 void NeoRampAgent::OnTimer(int Counter) {
-    if (Counter % 5 == 0) this->runScopeUpdate();
+    if (Counter % 10 == 0) this->runScopeUpdate();
 }
 
 PluginSDK::PluginMetadata NeoRampAgent::GetMetadata() const

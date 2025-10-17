@@ -17,6 +17,13 @@ void NeoRampAgent::RegisterCommand() {
 		definition.parameters.clear();
 
         versionId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
+
+        definition.name = "rampAgent report";
+        definition.description = "generate a report";
+        definition.lastParameterHasSpaces = false;
+		definition.parameters.clear();
+
+        reportId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
     }
     catch (const std::exception& ex)
     {
@@ -29,6 +36,7 @@ inline void NeoRampAgent::unegisterCommand()
     if (CommandProvider_)
     {
         chatAPI_->unregisterCommand(versionId_);
+        chatAPI_->unregisterCommand(reportId_);
         CommandProvider_.reset();
 	}
 }
@@ -40,6 +48,12 @@ Chat::CommandResult NeoRampAgentCommandProvider::Execute( const std::string &com
 		neoRampAgent_->DisplayMessage("Plugin Version: " + std::string(NEORAMPAGENT_VERSION), "");
         return { true, std::nullopt };
 	}
+    else if (commandId == neoRampAgent_->reportId_)
+    {
+		neoRampAgent_->sendReport();
+		neoRampAgent_->DisplayMessage("Report generated and sent.", "");
+		return { true, std::nullopt };
+    }
     else {
 		std::string error = "Unknown command ID: " + commandId;
         return { false, error };

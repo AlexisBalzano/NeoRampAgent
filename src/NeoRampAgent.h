@@ -53,6 +53,8 @@ namespace rampAgent {
         void runScopeUpdate();
         void run();
 		std::string toUpper(std::string str);
+
+    public:
         void generateReport(nlohmann::ordered_json& reportJson);
         void sendReport();
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
@@ -61,6 +63,7 @@ namespace rampAgent {
     public:
         // Command IDs
         std::string versionId_;
+		std::string reportId_; // FIXME: debug command
 
     private:
         // Plugin state

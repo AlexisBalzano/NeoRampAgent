@@ -147,11 +147,6 @@ jobs:
         with:
           path: all_builds
 
-      - name: Prepare config files for packaging
-        run: |
-          mkdir -p plugins/NeoRampAgent
-          cp FILE_PATH plugins/NeoRampAgent/
-
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:

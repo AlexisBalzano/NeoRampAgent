@@ -25,11 +25,11 @@ void NeoRampAgent::RegisterTagItems()
 
 
 // TAG ITEM UPDATE FUNCTIONS
-void NeoRampAgent::UpdateTagItems(std::string callsign) {
+void NeoRampAgent::UpdateTagItems(std::string callsign, std::string standName) {
     Tag::TagContext tagContext;
 	tagContext.callsign = callsign;
-	std::string standName = "N/A"; //FIXME: Retrieve stand name
-    tagInterface_->UpdateTagValue(standTagId_, standName, tagContext);
+	std::string stand = standName;
+    tagInterface_->UpdateTagValue(standTagId_, stand, tagContext);
 }
 
 // Update all tag items for all pilots

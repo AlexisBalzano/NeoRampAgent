@@ -84,7 +84,7 @@ namespace rampAgent {
         void OnTagAction(const Tag::TagActionEvent* event) override;
         void OnTagDropdownAction(const Tag::DropdownActionEvent* event) override;
         void UpdateTagItems();
-        void UpdateTagItems(std::string Callsign);
+        void UpdateTagItems(std::string Callsign, std::string standName = "N/A");
         void updateStandMenuButtons(const std::string& icao);
 
 	    // TAG Items IDs

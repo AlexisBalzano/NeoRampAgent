@@ -317,7 +317,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
     cli.set_read_timeout(5);
     cli.set_write_timeout(5);
     
-    auto res = cli.Post("/report", reportJson.dump(), "application/json");
+    auto res = cli.Post("/api/report", reportJson.dump(), "application/json");
 
     if (res && res->status >= 200 && res->status < 300) {
 		return res->body.empty() ? nlohmann::ordered_json::object() : nlohmann::ordered_json::parse(res->body);

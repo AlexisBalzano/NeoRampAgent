@@ -72,45 +72,93 @@ void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string 
 {
 }
 
-inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao)
+inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands)
 {
-    //std::vector<DataManager::Stand> stands = dataManager_->getAvailableStandsForAirport(icao); //FIXME:
+	nlohmann::ordered_json blockedStandsJson = getAllBlockedStands();
 
-    //PluginSDK::Tag::DropdownDefinition dropdownDef;
-    //dropdownDef.title = "STAND";
-    //dropdownDef.width = 75;
-    //dropdownDef.maxHeight = 150;
+	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
+	logger_->info("Updating stand menu for airport " + icao);
+    // HTTP (no TLS) to localhost:3000
+    httplib::Client cli("127.0.0.1", 3000);
+    cli.set_connection_timeout(2); // seconds
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-    //PluginSDK::Tag::DropdownComponent scrollArea;
-    //scrollArea.id = "SCROLL";
-    //scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
+    auto res = cli.Get("/api/airports/" + icao + "/stands", headers);
+
+    if (res && res->status >= 200 && res->status < 300) {
+        if (!res->body.empty()) standsJson = nlohmann::ordered_json::parse(res->body);
+    }
+    else {
+        logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0) + " (no detailed error available with this httplib version)");
+        return;
+    }
+
+	// deduct available stands list from all stands + occupied stands + blocked stands
+    std::vector<Stand> availableStands;
+    for (auto& [standName, standData] : standsJson.items()) {
+        Stand stand;
+        stand.name = standName;
+        stand.occupied = false;
+
+        // Check if stand is occupied
+        for (const auto& occupied : occupiedStands["assignedStands"]) {
+            if (occupied["name"].get<std::string>() == stand.name) {
+                stand.occupied = true;
+                break;
+            }
+        }
+		// Check if stand is blocked
+        for (const auto& occupied : blockedStandsJson["assignedStands"]) {
+            if (occupied["name"].get<std::string>() == stand.name) {
+                stand.occupied = true;
+                break;
+            }
+        }
+        if (!stand.occupied) {
+            availableStands.push_back(stand);
+        }
+	}
+
+	//Sort stands alphabetically -> 2A,2B, 3A,3B,...
+	sortStandList(availableStands);
+
+    PluginSDK::Tag::DropdownDefinition dropdownDef;
+    dropdownDef.title = "STAND";
+    dropdownDef.width = 75;
+    dropdownDef.maxHeight = 150;
+
+    PluginSDK::Tag::DropdownComponent scrollArea;
+    scrollArea.id = "SCROLL";
+    scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
 
 
-    //PluginSDK::Tag::DropdownComponent dropdownComponent;
-    //PluginSDK::Tag::DropdownComponentStyle style;
+    PluginSDK::Tag::DropdownComponent dropdownComponent;
+    PluginSDK::Tag::DropdownComponentStyle style;
 
-    //style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
+    style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
-    //dropdownComponent.id = "None";
-    //dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-    //dropdownComponent.text = "None";
-    //dropdownComponent.requiresInput = false;
-    //dropdownComponent.style = style;
-    //scrollArea.children.push_back(dropdownComponent);
+    dropdownComponent.id = "None";
+    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+    dropdownComponent.text = "None";
+    dropdownComponent.requiresInput = false;
+    dropdownComponent.style = style;
+    scrollArea.children.push_back(dropdownComponent);
 
 
-    //for (const auto& stand : stands) {
-    //    dropdownComponent.id = stand.name;
-    //    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-    //    dropdownComponent.text = stand.name;
-    //    dropdownComponent.requiresInput = false;
-    //    dropdownComponent.style = style;
-    //    scrollArea.children.push_back(dropdownComponent);
-    //}
+    for (const auto& stand : availableStands) {
+        dropdownComponent.id = stand.name;
+        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+        dropdownComponent.text = stand.name;
+        dropdownComponent.requiresInput = false;
+        dropdownComponent.style = style;
+        scrollArea.children.push_back(dropdownComponent);
+    }
 
-    //dropdownDef.components.push_back(scrollArea);
+    dropdownDef.components.push_back(scrollArea);
 
-    //tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
+    tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
 }
 
 }  // namespace rampAgent

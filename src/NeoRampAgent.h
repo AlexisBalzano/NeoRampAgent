@@ -14,6 +14,12 @@ using namespace PluginSDK;
 
 namespace rampAgent {
 
+    struct Stand {
+        std::string name;
+        std::string icao;
+        bool occupied;
+    };
+
     class NeoRampAgentCommandProvider;
 
     class NeoRampAgent : public BasePlugin
@@ -55,11 +61,13 @@ namespace rampAgent {
         void run();
 		std::string toUpper(std::string str);
         bool isController();
+        void sortStandList(std::vector<Stand>& standList);
 
     public:
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllOccupiedStands(); //used to update tags when not sending reports
+        nlohmann::ordered_json getAllBlockedStands();
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
         //nlohmann::ordered_json getAllStands(std::string icao);
 
@@ -97,7 +105,7 @@ namespace rampAgent {
         void OnTagDropdownAction(const Tag::DropdownActionEvent* event) override;
         void UpdateTagItems();
         void UpdateTagItems(std::string Callsign, std::string standName = "N/A");
-        void updateStandMenuButtons(const std::string& icao);
+        void updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands);
 
 	    // TAG Items IDs
 		std::string standTagId_;

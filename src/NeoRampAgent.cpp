@@ -151,6 +151,68 @@ bool rampAgent::NeoRampAgent::isController()
     return false;
 }
 
+void rampAgent::NeoRampAgent::sortStandList(std::vector<Stand>& standList)
+{
+    std::sort(standList.begin(), standList.end(), [](const Stand& a, const Stand& b) {
+        auto key = [](const std::string& s) {
+            size_t i = 0, n = s.size();
+
+            // Trim leading spaces
+            while (i < n && std::isspace(static_cast<unsigned char>(s[i]))) ++i;
+
+            // Leading number
+            int num = 0;
+            bool hasNum = false;
+            while (i < n && std::isdigit(static_cast<unsigned char>(s[i]))) {
+                hasNum = true;
+                int digit = s[i] - '0';
+                if (num > (std::numeric_limits<int>::max() - digit) / 10) {
+                    num = std::numeric_limits<int>::max(); // clamp on overflow
+                }
+                else {
+                    num = num * 10 + digit;
+                }
+                ++i;
+            }
+
+            // Immediate letter suffix (A, B, AB, ...)
+            std::string letters;
+            while (i < n && std::isalpha(static_cast<unsigned char>(s[i]))) {
+                letters.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(s[i]))));
+                ++i;
+            }
+
+            // Remainder (for stable tie-breaking, case-insensitive)
+            std::string tailUpper;
+            tailUpper.reserve(n - i);
+            for (; i < n; ++i) {
+                unsigned char c = static_cast<unsigned char>(s[i]);
+                tailUpper.push_back(static_cast<char>(std::toupper(c)));
+            }
+
+            // Bare names (no numeric prefix) go to the end.
+            return std::tuple<int, std::string, std::string, std::string>(
+                hasNum ? num : std::numeric_limits<int>::max(), letters, tailUpper, s
+            );
+            };
+
+        const auto [an, al, ar, as] = key(a.name);
+        const auto [bn, bl, br, bs] = key(b.name);
+
+        if (an != bn) return an < bn;
+
+        // If numbers equal, empty suffix (e.g., "2") comes before non-empty (e.g., "2A")
+        if (al != bl) {
+            if (al.empty() != bl.empty()) return al.empty();
+            return al < bl; // case-insensitive compare via uppercased letters
+        }
+
+        // Fallback to case-insensitive remainder, then original (stable) name
+        if (ar != br) return ar < br;
+        return as < bs;
+        });
+}
+
 void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 {
     reportJson.clear();
@@ -273,8 +335,33 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllOccupiedStands()
 
     if (res && res->status >= 200 && res->status < 300) {
 		if (!res->body.empty()) occupiedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
-		logger_->log(Logger::LogLevel::Info, "Occupied Stands response from getAllOccupied:" + occupiedStandsJson.dump());
 		return occupiedStandsJson;
+    }
+    else {
+        logger_->error(
+            "Failed to send report to NeoRampAgent server. HTTP status: " +
+            std::to_string(res ? res->status : 0) +
+            " (no detailed error available with this httplib version)"
+        );
+    }
+    return nlohmann::ordered_json::object();
+}
+
+nlohmann::ordered_json rampAgent::NeoRampAgent::getAllBlockedStands()
+{
+    nlohmann::ordered_json blockedStandsJson = nlohmann::ordered_json::object();
+    // HTTP (no TLS) to localhost:3000
+    httplib::Client cli("127.0.0.1", 3000);
+    cli.set_connection_timeout(2); // seconds
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
+
+    auto res = cli.Get("/api/occupancy/blocked", headers);
+
+    if (res && res->status >= 200 && res->status < 300) {
+        if (!res->body.empty()) blockedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+        return blockedStandsJson;
     }
     else {
         logger_->error(
@@ -295,6 +382,8 @@ void NeoRampAgent::runScopeUpdate() {
         logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");
         return;
     }
+
+	updateStandMenuButtons("LFMN", occupiedStands); //FIXME: hardcoded for now, need to get current airport from selected traffic
     
     auto& assigned = occupiedStands["assignedStands"];
     for (auto& stand : assigned) {

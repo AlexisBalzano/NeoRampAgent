@@ -259,10 +259,37 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
     return nlohmann::ordered_json::object();
 }
 
+nlohmann::ordered_json rampAgent::NeoRampAgent::getAllOccupiedStands()
+{
+	nlohmann::ordered_json occupiedStandsJson = nlohmann::ordered_json::object();
+    // HTTP (no TLS) to localhost:3000
+    httplib::Client cli("127.0.0.1", 3000);
+    cli.set_connection_timeout(2); // seconds
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
+
+    auto res = cli.Get("/api/occupancy/occupied", headers);
+
+    if (res && res->status >= 200 && res->status < 300) {
+		if (!res->body.empty()) occupiedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+		logger_->log(Logger::LogLevel::Info, "Occupied Stands response from getAllOccupied:" + occupiedStandsJson.dump());
+		return occupiedStandsJson;
+    }
+    else {
+        logger_->error(
+            "Failed to send report to NeoRampAgent server. HTTP status: " +
+            std::to_string(res ? res->status : 0) +
+            " (no detailed error available with this httplib version)"
+        );
+    }
+    return nlohmann::ordered_json::object();
+}
+
 void NeoRampAgent::runScopeUpdate() {
 	nlohmann::ordered_json occupiedStands;
     if (canSendReport_) occupiedStands = sendReport(); // Use response to update tags
-    //else occupiedStands = getAllOccupiedStands();
+    else occupiedStands = getAllOccupiedStands();
 
     if (occupiedStands.empty()) {
         logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");

@@ -320,7 +320,13 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
     auto res = cli.Post("/api/report", reportJson.dump(), "application/json");
 
     if (res && res->status >= 200 && res->status < 300) {
-		return res->body.empty() ? nlohmann::ordered_json::object() : nlohmann::ordered_json::parse(res->body);
+        try {
+		    return res->body.empty() ? nlohmann::ordered_json::object() : nlohmann::ordered_json::parse(res->body);
+        }
+        catch (const std::exception& e) {
+            logger_->error("Failed to parse response from NeoRampAgent server: " + std::string(e.what()));
+            return nlohmann::ordered_json::object();
+		}
     } else {
         logger_->error(
             "Failed to send report to NeoRampAgent server. HTTP status: " +
@@ -344,8 +350,14 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllOccupiedStands()
     auto res = cli.Get("/api/occupancy/occupied", headers);
 
     if (res && res->status >= 200 && res->status < 300) {
-		if (!res->body.empty()) occupiedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
-		return occupiedStandsJson;
+        try {
+		    if (!res->body.empty()) occupiedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+		    return occupiedStandsJson;
+        }
+        catch (const std::exception& e) {
+            logger_->error("Failed to parse occupied stands data from NeoRampAgent server: " + std::string(e.what()));
+            return nlohmann::ordered_json::object();
+        }
     }
     else {
         logger_->error(
@@ -370,8 +382,14 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllBlockedStands()
     auto res = cli.Get("/api/occupancy/blocked", headers);
 
     if (res && res->status >= 200 && res->status < 300) {
-        if (!res->body.empty()) blockedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
-        return blockedStandsJson;
+        try {
+            if (!res->body.empty()) blockedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+            return blockedStandsJson;
+        }
+        catch (const std::exception& e) {
+            logger_->error("Failed to parse blocked stands data from NeoRampAgent server: " + std::string(e.what()));
+            return nlohmann::ordered_json::object();
+		}
     }
     else {
         logger_->error(
@@ -394,7 +412,7 @@ void NeoRampAgent::runScopeUpdate() {
     }
 
 	updateStandMenuButtons("LFMN", occupiedStands); //FIXME: hardcoded for now, need to get current airport from selected traffic
-    
+
     auto& assigned = occupiedStands["assignedStands"];
     for (auto& stand : assigned) {
         std::string callsign = stand["callsign"].get<std::string>();

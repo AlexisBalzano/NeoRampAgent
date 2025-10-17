@@ -48,24 +48,25 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
     {
         return;
     }
-    //std::optional<DataManager::Pilot> pilot = dataManager_->getPilotByCallsign(event->callsign); //FIXME:
-    //if (!pilot || pilot->empty()) return;
 
-    //if (event->componentId == "None")
-    //{
-    //    if (!pilot->stand.empty())
-    //    {
-    //        dataManager_->freeStand(pilot->stand);
-    //        pilot->stand.clear();
-    //        dataManager_->updatePilotStand(pilot->callsign, pilot->stand);
-    //        UpdateTagItems(pilot->callsign);
-    //    }
-    //    return;
-    //}
+	logger_->info("Trying to manually assign: " + event->componentId + " to: " + event->callsign);
 
-    //dataManager_->assignStandToPilot(pilot->callsign, event->componentId);
-    //UpdateTagItems(pilot->callsign);
+    // HTTP (no TLS) to localhost:3000
+    httplib::Client cli("127.0.0.1", 3000);
+    cli.set_connection_timeout(2); // seconds
+    cli.set_read_timeout(5);
+    cli.set_write_timeout(5);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
+	std::string standName = event->componentId;
+	std::string icao = "LFMN"; //FIXME: hardcoded for now, need to get current airport from selected traffic
+
+    auto res = cli.Get("/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign, headers);
+
+    if (!res || !(res->status >= 200 && res->status < 300)) {
+        logger_->error("Failed to send manual assign to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+        return;
+    }
 }
 
 void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string &actionId, const std::string &userInput)
@@ -88,12 +89,23 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     auto res = cli.Get("/api/airports/" + icao + "/stands", headers);
 
     if (res && res->status >= 200 && res->status < 300) {
-        if (!res->body.empty()) standsJson = nlohmann::ordered_json::parse(res->body);
+        try {
+            if (!res->body.empty()) standsJson = nlohmann::ordered_json::parse(res->body);
+        }
+        catch (const std::exception& e) {
+            logger_->error("Failed to parse stands data from NeoRampAgent server: " + std::string(e.what()));
+            return;
+        }
     }
     else {
-        logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0) + " (no detailed error available with this httplib version)");
+        logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
         return;
     }
+
+    if (standsJson.empty()) {
+        logger_->warning("No stands data received to update stand menu.");
+        return;
+	}
 
 	// deduct available stands list from all stands + occupied stands + blocked stands
     std::vector<Stand> availableStands;

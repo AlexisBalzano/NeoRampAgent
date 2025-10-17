@@ -48,6 +48,8 @@ void NeoRampAgent::Initialize(const PluginMetadata &metadata, CoreAPI *coreAPI, 
         this->RegisterCommand();
 
         initialized_ = true;
+		canSendReport_ = isController();
+		LOG_DEBUG(Logger::LogLevel::Info, "NeoRampAgent initialized successfully");
     }
     catch (const std::exception &e)
     {
@@ -134,6 +136,21 @@ std::string rampAgent::NeoRampAgent::toUpper(std::string str)
 	return str;
 }
 
+bool rampAgent::NeoRampAgent::isController()
+{
+#ifdef DEV
+	return true;
+#endif // DEV
+
+	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
+    if (connectionInfo.has_value() && connectionInfo->isConnected) {
+        if (connectionInfo->facility >= Fsd::NetworkFacility::DEL) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 {
     reportJson.clear();
@@ -212,14 +229,14 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
     }
 }
 
-void rampAgent::NeoRampAgent::sendReport()
+nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 {
     nlohmann::ordered_json reportJson;
     generateReport(reportJson);
 
     if (reportJson.empty()) {
         logger_->log(Logger::LogLevel::Info, "Skipping report: no data to send.");
-        return;
+        return nlohmann::ordered_json::object();
     }
 
     // HTTP (no TLS) to localhost:3000
@@ -231,7 +248,7 @@ void rampAgent::NeoRampAgent::sendReport()
     auto res = cli.Post("/report", reportJson.dump(), "application/json");
 
     if (res && res->status >= 200 && res->status < 300) {
-		//Use response to update tags/return response
+		return res->body.empty() ? nlohmann::ordered_json::object() : nlohmann::ordered_json::parse(res->body);
     } else {
         logger_->error(
             "Failed to send report to NeoRampAgent server. HTTP status: " +
@@ -239,11 +256,36 @@ void rampAgent::NeoRampAgent::sendReport()
             " (no detailed error available with this httplib version)"
         );
     }
+    return nlohmann::ordered_json::object();
 }
 
 void NeoRampAgent::runScopeUpdate() {
-	sendReport(); // Use response to update tags
-    //UpdateTagItems(); //FIXME:
+	nlohmann::ordered_json occupiedStands;
+    if (canSendReport_) occupiedStands = sendReport(); // Use response to update tags
+    //else occupiedStands = getAllOccupiedStands();
+
+    if (occupiedStands.empty()) {
+        logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");
+        return;
+    }
+    
+    auto& assigned = occupiedStands["assignedStands"];
+    for (auto& stand : assigned) {
+        std::string callsign = stand["callsign"].get<std::string>();
+        std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);
+        if (!acOpt.has_value()) {
+            continue; // Aircraft not found, skip
+        }
+
+        std::string standName = stand["name"].get<std::string>();
+        UpdateTagItems(callsign, standName);
+    }
+}
+
+void rampAgent::NeoRampAgent::OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event)
+{
+	// recheck connection status to determine if we can send reports
+	canSendReport_ = isController();
 }
 
 void NeoRampAgent::OnTimer(int Counter) {

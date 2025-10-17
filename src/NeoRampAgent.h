@@ -33,6 +33,7 @@ namespace rampAgent {
         void DisplayMessage(const std::string& message, const std::string& sender = "");
 		
         // Scope events
+		virtual void OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event) override;
         void OnTimer(int Counter);
 
         // Command handling
@@ -53,10 +54,12 @@ namespace rampAgent {
         void runScopeUpdate();
         void run();
 		std::string toUpper(std::string str);
+        bool isController();
 
     public:
         void generateReport(nlohmann::ordered_json& reportJson);
-        void sendReport();
+        nlohmann::ordered_json sendReport();
+        //void getAllOccupiedStands(); //used to update tags when not sending reports
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
         //nlohmann::ordered_json getAllStands(std::string icao);
 
@@ -68,6 +71,7 @@ namespace rampAgent {
         // Plugin state
         bool initialized_ = false;
         std::thread m_worker;
+		bool canSendReport_ = false;
         bool m_stop;
 
         // APIs

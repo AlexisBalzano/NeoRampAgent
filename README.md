@@ -1,0 +1,12 @@
+# NeoRampAgent_
+PLUGIN_DESCRIPTION_ for *NeoRadar* ATC Client <br>
+<br>
+
+# Installation
+PLUGIN_INSTALLATION_INSTRUCTIONS
+
+# Usage
+PLUGIN_USAGE_INSTRUCTIONS
+
+# Commands
+PLUGIN_COMMANDS

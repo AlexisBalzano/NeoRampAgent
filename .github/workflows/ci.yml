@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - Dev
+  pull_request:
+    branches:
+      - main
+      - Dev
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    env:
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      build_type: Release
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+        architecture: [x86_64, arm64]
+        # Adds a platform value to the matrix, used later on to run the appropriate
+        # package command.
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: mac
+          - os: windows-2022
+            platform: win
+        exclude:
+          - os: ubuntu-latest
+            architecture: arm64
+          - os: windows-2022
+            architecture: arm64
+
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --recursive
+
+      - name: Get commit short SHA
+        uses: benjlevesque/short-sha@v3.0
+        id: short-sha
+
+      - name: Compute version
+        id: compute_version
+        shell: bash
+        run: |
+          version="${{ steps.short-sha.outputs.sha }}"
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            version=$(echo ${{ github.ref }} | sed -E 's/refs\/tags\/(v)?//g')
+          fi
+          echo "version=$version" >> $GITHUB_OUTPUT
+      
+      - name: Setup Ubuntu compiler
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          
+          # Install g++-13 (more reliable)
+          sudo apt-get install -y g++-13
+          
+          # Use g++-13 as default
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          
+          # Create symlink for g++-14 pointing to g++-13
+          sudo ln -sf /usr/bin/g++-13 /usr/bin/g++-14
+          
+          # Verify our setup
+          g++ --version
+          g++-14 --version
+          
+          # Update CMakeLists.txt in NeoRadarSDK to avoid the g++-14 check
+          if [ -f "External/NeoRadarSDK/CMakeLists.txt" ]; then
+            sed -i 's/set(CMAKE_CXX_COMPILER "g++-14")/# Using system compiler instead/' External/NeoRadarSDK/CMakeLists.txt
+          fi
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30.x'
+
+      - name: Use cmake
+        run: cmake --version
+
+      - name: Setup MacOS environment
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install utf8proc
+
+      - name: Configure CMake (Windows and Linux)
+        if: matrix.os != 'macos-latest'
+        shell: bash
+        run: |
+          cmake . -DPLUGIN_VERSION=${{ steps.compute_version.outputs.version }}
+
+      - name: Configure CMake (MacOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          cmake . -DPLUGIN_VERSION=${{ steps.compute_version.outputs.version }} -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }}
+
+      - name: Build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cmake --build . --config ${{ env.build_type }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeoRampAgent-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: |
+            lib/NeoRampAgent*
+            bin/NeoRampAgent*
+            bin/${{ env.build_type }}/NeoRampAgent*
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_builds
+
+      - name: Prepare config files for packaging
+        run: |
+          mkdir -p plugins/NeoRampAgent
+          cp FILE_PATH plugins/NeoRampAgent/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install NeoRadar CLI
+        run: yarn global add https://github.com/neoradar-project/cli.git
+
+      - name: Organize plugin binaries for packaging
+        run: |
+          mkdir -p all_builds/NeoRampAgent
+          find all_builds -type f -name 'NeoRampAgent*' -exec cp {} all_builds/NeoRampAgent/ \;
+
+      - name: List files after organizing
+        run: ls -R all_builds
+
+      - name: Rename binaries by platform and architecture
+        shell: bash
+        run: |
+          for f in all_builds/NeoRampAgent/*; do
+            ext="${f##*.}"
+            base=$(basename "$f")
+            # Detect platform and arch from the filename or from the file extension
+            if [[ "$base" == *"dylib" ]]; then
+              # macOS
+              if [[ "$base" == *"arm64"* ]]; then
+                mv "$f" "all_builds/NeoRampAgent/mac-arm64.dylib"
+              else
+                mv "$f" "all_builds/NeoRampAgent/mac-x64.dylib"
+              fi
+            elif [[ "$base" == *"so" ]]; then
+              # Linux
+              mv "$f" "all_builds/NeoRampAgent/linux-x64.so"
+            elif [[ "$base" == *"dll" ]]; then
+              # Windows
+              mv "$f" "all_builds/NeoRampAgent/windows-x64.dll"
+            fi
+          done
+
+      - name: Package .nrplugin
+        run: |
+          echo y | neoradar-cli create-plugin-archives ./all_builds
+
+      - name: Upload final .nrplugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins
+          path: plugins

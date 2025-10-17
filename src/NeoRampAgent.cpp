@@ -2,7 +2,6 @@
 #include <numeric>
 #include <chrono>
 #include <httplib.h>
-#include <nlohmann/json.hpp>
 
 #include "Version.h"
 #include "core/CompileCommands.h"
@@ -62,7 +61,7 @@ void NeoRampAgent::Initialize(const PluginMetadata &metadata, CoreAPI *coreAPI, 
 std::pair<bool, std::string> rampAgent::NeoRampAgent::newVersionAvailable()
 {
     httplib::SSLClient cli("api.github.com");
-    httplib::Headers headers = { {"User-Agent", "NeoRampAgentversionChecker"} };
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"} };
     std::string apiEndpoint = "/repos/AlexisBalzano/NeoRampAgent/releases/latest";
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
@@ -127,6 +126,112 @@ void NeoRampAgent::run() {
         counter++;
         OnTimer(counter);
     }
+}
+
+std::string rampAgent::NeoRampAgent::toUpper(std::string str)
+{
+	std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+	return str;
+}
+
+void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
+{
+    reportJson.clear();
+
+    // need to retrieve all aircraft in range and format json report
+    std::vector<Aircraft::Aircraft> aircrafts = aircraftAPI_->getAll();
+
+    // Filter for ground aircraft
+    std::vector<Aircraft::Aircraft> groundAircrafts;
+    for (const auto& ac : aircrafts) {
+        if (ac.position.onGround) {
+            groundAircrafts.push_back(ac);
+        }
+    }
+
+    // Filter for airborn aircraft
+    std::vector<Aircraft::Aircraft> airbornAircrafts;
+    for (const auto& ac : aircrafts) {
+        if (!ac.position.onGround) {
+            std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
+            if (!fp.has_value()) continue; // Skip if no flightplan found
+            airbornAircrafts.push_back(ac);
+        }
+    }
+
+    std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
+    if (!connectionInfo.has_value()) {
+        DisplayMessage("Not connected to FSD server. Cannot send report.", "NeoRampAgent");
+        logger_->log(Logger::LogLevel::Warning, "Not connected to FSD server. Cannot send report.");
+        return;
+    }
+    std::string currentATC = connectionInfo->callsign;
+
+    reportJson["client"] = currentATC;
+
+    for (const auto& ac : groundAircrafts) {
+        nlohmann::ordered_json acJson;
+        std::string callsign = toUpper(ac.callsign);
+        std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
+        std::string origin = "N/A";
+        std::string aircraftType = "ZZZZ";
+        if (fp.has_value()) {
+            origin = toUpper(fp->origin);
+            aircraftType = toUpper(fp->acType);
+        }
+
+        acJson[callsign]["origin"] = origin;
+        acJson[callsign]["aircraftType"] = aircraftType;
+        acJson[callsign]["position"]["lat"] = ac.position.latitude;
+        acJson[callsign]["position"]["lon"] = ac.position.longitude;
+        reportJson["aircrafts"]["onGround"].push_back(acJson);
+    }
+
+    for (const auto& ac : airbornAircrafts) {
+        nlohmann::ordered_json acJson;
+        std::string callsign = toUpper(ac.callsign);
+        std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
+        std::string origin = "N/A";
+        std::string destination = "N/A";
+        std::string aircraftType = "ZZZZ";
+        if (fp.has_value()) {
+            origin = toUpper(fp->origin);
+            destination = toUpper(fp->destination);
+            aircraftType = toUpper(fp->acType);
+        }
+
+        std::optional<double> distOpt = aircraftAPI_->getDistanceToDestination(ac.callsign);
+        double dist = distOpt.value_or(-1);
+
+        acJson[callsign]["origin"] = origin;
+        acJson[callsign]["destination"] = destination;
+        acJson[callsign]["aircraftType"] = aircraftType;
+        acJson[callsign]["position"]["lat"] = ac.position.latitude;
+        acJson[callsign]["position"]["lon"] = ac.position.longitude;
+        acJson[callsign]["position"]["alt"] = ac.position.altitude;
+        acJson[callsign]["position"]["dist"] = dist;
+        reportJson["aircrafts"]["airborne"].push_back(acJson);
+    }
+
+    std::string reportStr = reportJson.dump();
+    logger_->log(Logger::LogLevel::Info, "RampAgent Report: " + reportStr);
+}
+
+void rampAgent::NeoRampAgent::sendReport()
+{
+	nlohmann::ordered_json reportJson;
+    generateReport(reportJson);
+
+ //   httplib::SSLClient cli("neorampagent.alexisbalzano.fr");
+ //   httplib::Headers headers = { {"User-Agent", "NeoRampAgentReportSender"}, {"Content-Type", "application/json"} };
+ //   std::string apiEndpoint = "/api/v1/report";
+ //   auto res = cli.Post(apiEndpoint.c_str(), headers, reportJson.dump(), "application/json");
+ //   if (res && res->status == 200) {
+ //       logger_->log(Logger::LogLevel::Info, "Report sent successfully to NeoRampAgent server.");
+ //   }
+ //   else {
+ //       logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+	//}
 }
 
 void NeoRampAgent::runScopeUpdate() {

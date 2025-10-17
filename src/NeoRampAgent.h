@@ -2,6 +2,8 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <nlohmann/json.hpp>
+
 
 #include "NeoRadarSDK/SDK.h"
 #include "core/NeoRampAgentCommandProvider.h"
@@ -50,7 +52,11 @@ namespace rampAgent {
     private:
         void runScopeUpdate();
         void run();
-        //void sendReport();
+		std::string toUpper(std::string str);
+        void generateReport(nlohmann::ordered_json& reportJson);
+        void sendReport();
+		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
+        //nlohmann::ordered_json getAllStands(std::string icao);
 
     public:
         // Command IDs

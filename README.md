@@ -1,12 +1,18 @@
 # NeoRampAgent_
-PLUGIN_DESCRIPTION_ for *NeoRadar* ATC Client <br>
+Ramp Agent interface for *NeoRadar* ATC Client <br>
 <br>
 
 # Installation
-PLUGIN_INSTALLATION_INSTRUCTIONS
+- download the latest release from the **Releases**
+- Place the `.nrplugin` inside the `Plugins` folder of your NeoRadar installation
+- Actiavate the plugin in NeoRadar settings
+- Add tag item to your layout `plugin:NeoRampAgent:TAG_STAND`
 
 # Usage
-PLUGIN_USAGE_INSTRUCTIONS
+- Once loaded and connected to network, the plugin will automatically fetch and display stands
+- You need to be connected as an **ATC** to be able to send data to *Ramp Agent API* & manually assign stands
 
 # Commands
-PLUGIN_COMMANDS
+Available commands to interact with the plugin:
+- `.rampAgent version`: Display the current version of the plugin
+- `.rampAgent menu <ICAO>`: Change stand menu ICAO to specified airport.

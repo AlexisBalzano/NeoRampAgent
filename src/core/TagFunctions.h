@@ -49,6 +49,11 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
         return;
     }
 
+    if (canSendReport_ == false || isConnected_ == false) {
+        logger_->warning("Ignoring manual stand assignment - not connected as controller.");
+        return;
+	}
+
 	logger_->info("Trying to manually assign: " + event->componentId + " to: " + event->callsign);
 
     // HTTP (no TLS) to localhost:3000

@@ -59,22 +59,25 @@ namespace rampAgent {
     private:
         void runScopeUpdate();
         void run();
-		std::string toUpper(std::string str);
 		bool isConnected();
         bool isController();
         void sortStandList(std::vector<Stand>& standList);
 
     public:
+		std::string toUpper(std::string str);
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllOccupiedStands(); //used to update tags when not sending reports
         nlohmann::ordered_json getAllBlockedStands();
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
         //nlohmann::ordered_json getAllStands(std::string icao);
+		std::string getMenuICAO() const { return menuICAO_; }
+		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
 
     public:
         // Command IDs
         std::string versionId_;
+		std::string menuId_;
 
     private:
         // Plugin state
@@ -83,6 +86,7 @@ namespace rampAgent {
 		bool canSendReport_ = false;
         bool isConnected_ = false;
         bool m_stop;
+		std::string menuICAO_ = "LFPG"; //default airport for menu
 
         // APIs
         PluginMetadata metadata_;

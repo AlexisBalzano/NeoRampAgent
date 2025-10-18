@@ -59,7 +59,18 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
     httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
 	std::string standName = event->componentId;
-	std::string icao = "LFMN"; //FIXME: hardcoded for now, need to get current airport from selected traffic
+	std::string icao = menuICAO_;
+    
+	std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(event->callsign);
+	if (!fpOpt) {
+		logger_->error("No flightplan found for " + event->callsign + " during manual stand assignment.");
+		return;
+	}
+
+    if (icao != fpOpt->destination) {
+		logger_->warning("Assigned stand " + standName + " at " + icao + " does not match flightplan destination " + fpOpt->destination + " for " + event->callsign);
+		return;
+    }
 
     auto res = cli.Get("/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign, headers);
 

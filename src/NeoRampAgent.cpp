@@ -411,7 +411,7 @@ void NeoRampAgent::runScopeUpdate() {
         return;
     }
 
-	updateStandMenuButtons("LFMN", occupiedStands); //FIXME: hardcoded for now, need to get current airport from selected traffic
+	updateStandMenuButtons(menuICAO_, occupiedStands);
 
     auto& assigned = occupiedStands["assignedStands"];
     for (auto& stand : assigned) {

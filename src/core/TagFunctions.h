@@ -91,6 +91,9 @@ void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string 
 
 inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands)
 {
+    if (canSendReport_ == false || isConnected_ == false) {
+		return;
+	}
 	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
 	logger_->info("Updating stand menu for airport " + icao);
     // HTTP (no TLS) to localhost:3000
@@ -135,8 +138,15 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         stand.name = standName;
         stand.occupied = false;
 
-        // Check if stand is occupied
+        // Check if stand is already Assigned
         for (const auto& occupied : occupiedStands["assignedStands"]) {
+            if (occupied["name"].get<std::string>() == stand.name) {
+                stand.occupied = true;
+                break;
+            }
+        }
+        // Check if stand is already occupied
+        for (const auto& occupied : occupiedStands["occupiedStands"]) {
             if (occupied["name"].get<std::string>() == stand.name) {
                 stand.occupied = true;
                 break;

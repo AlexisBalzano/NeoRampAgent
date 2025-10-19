@@ -342,9 +342,9 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 	return nlohmann::ordered_json::object();
 }
 
-nlohmann::ordered_json rampAgent::NeoRampAgent::getAllOccupiedStands()
+nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 {
-	nlohmann::ordered_json occupiedStandsJson = nlohmann::ordered_json::object();
+	nlohmann::ordered_json assignedStandsJson = nlohmann::ordered_json::object();
 	// HTTP (no TLS) to localhost:3000
 	httplib::Client cli("127.0.0.1", 3000);
 	cli.set_connection_timeout(2); // seconds
@@ -352,13 +352,13 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllOccupiedStands()
 	cli.set_write_timeout(5);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-	auto res = cli.Get("/api/occupancy/occupied", headers);
+	auto res = cli.Get("/api/occupancy/assigned", headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success
 		try {
-			if (!res->body.empty()) occupiedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
-			return occupiedStandsJson;
+			if (!res->body.empty()) assignedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+			return assignedStandsJson;
 		}
 		catch (const std::exception& e) {
 			logger_->error("Failed to parse occupied stands data from NeoRampAgent server: " + std::string(e.what()));
@@ -417,11 +417,11 @@ bool rampAgent::NeoRampAgent::dumpReportToLogFile()
 }
 
 void NeoRampAgent::runScopeUpdate() {
-	nlohmann::ordered_json occupiedStands;
-	if (canSendReport_) occupiedStands = sendReport(); // Use response to update tags
-	else occupiedStands = getAllOccupiedStands();
+	nlohmann::ordered_json assignedStands;
+	if (canSendReport_) assignedStands = sendReport(); // Use response to update tags
+	else assignedStands = getAllAssignedStands();
 
-	if (occupiedStands.empty()) {
+	if (assignedStands.empty()) {
 		if (printError) {
 			DisplayMessage("No occupied stands data received to update tags.", "");
 			logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");
@@ -430,9 +430,9 @@ void NeoRampAgent::runScopeUpdate() {
 		return;
 	}
 
-	updateStandMenuButtons(menuICAO_, occupiedStands);
+	updateStandMenuButtons(menuICAO_, assignedStands);
 
-	auto& assigned = occupiedStands["assignedStands"];
+	auto& assigned = assignedStands["assignedStands"];
 	for (auto& stand : assigned) {
 		std::string callsign = stand["callsign"].get<std::string>();
 		std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);

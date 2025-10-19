@@ -68,7 +68,7 @@ namespace rampAgent {
 		std::string toUpper(std::string str);
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
-        nlohmann::ordered_json getAllOccupiedStands(); //used to update tags when not sending reports
+        nlohmann::ordered_json getAllAssignedStands(); //used to update tags when not sending reports
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
         //nlohmann::ordered_json getAllStands(std::string icao);
 		std::string getMenuICAO() const { return menuICAO_; }

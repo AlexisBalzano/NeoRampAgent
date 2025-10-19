@@ -17,6 +17,13 @@ void NeoRampAgent::RegisterCommand() {
 		definition.parameters.clear();
 
         versionId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
+
+        definition.name = "rampAgent dump";
+        definition.description = "Dump latest report to log file";
+        definition.lastParameterHasSpaces = false;
+		definition.parameters.clear();
+
+        dumpId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
         
         definition.name = "rampAgent menu";
         definition.description = "Display select stand menu ICAO";
@@ -43,6 +50,7 @@ inline void NeoRampAgent::unegisterCommand()
     if (CommandProvider_)
     {
         chatAPI_->unregisterCommand(versionId_);
+        chatAPI_->unregisterCommand(dumpId_);
         chatAPI_->unregisterCommand(menuId_);
         CommandProvider_.reset();
 	}
@@ -60,6 +68,19 @@ Chat::CommandResult NeoRampAgentCommandProvider::Execute( const std::string &com
         std::string menuIcao = neoRampAgent_->changeMenuICAO(neoRampAgent_->toUpper(args[0]));
         neoRampAgent_->DisplayMessage("Stand menu ICAO changed to: " + menuIcao, "");
 		return { true, std::nullopt };
+    }
+    else if (commandId == neoRampAgent_->dumpId_)
+    {
+		//TODO: implement dump to log functionality
+		bool result = neoRampAgent_->dumpReportToLogFile();
+        if (result) {
+            neoRampAgent_->DisplayMessage("Report dumped to NeoRadar/logs/plugins/NeoRampAgent.", "");
+            return { true, std::nullopt };
+        }
+        else {
+            std::string error = "Failed to dump report to log file.";
+            return { true, error };
+		}
     }
     else {
 		std::string error = "Unknown command ID: " + commandId;

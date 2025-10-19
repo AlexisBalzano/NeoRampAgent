@@ -103,6 +103,7 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     auto res = cli.Get("/api/airports/" + icao + "/stands", headers);
 
     if (res && res->status >= 200 && res->status < 300) {
+		printError = true; // reset error printing flag on success
         try {
             if (!res->body.empty()) standsJson = nlohmann::ordered_json::parse(res->body);
         }
@@ -112,12 +113,18 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         }
     }
     else {
-        logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+        if (printError) {
+            printError = false; // avoid spamming logs
+            logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+		}
         return;
     }
 
     if (standsJson.empty()) {
-        logger_->warning("No stands data received to update stand menu.");
+        if (printError) {
+            printError = false; // avoid spamming logs
+            logger_->error("No stands data received from NeoRampAgent server for airport " + icao);
+        }
         return;
 	}
 

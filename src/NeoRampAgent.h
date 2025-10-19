@@ -9,6 +9,7 @@
 #include "core/NeoRampAgentCommandProvider.h"
 
 constexpr const char* NEORAMPAGENT_VERSION = "v0.0.1";
+constexpr const char* RAMPAGENT_API = "";
 
 using namespace PluginSDK;
 
@@ -68,16 +69,18 @@ namespace rampAgent {
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllOccupiedStands(); //used to update tags when not sending reports
-        nlohmann::ordered_json getAllBlockedStands();
 		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
         //nlohmann::ordered_json getAllStands(std::string icao);
 		std::string getMenuICAO() const { return menuICAO_; }
 		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
+        bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
+		bool dumpReportToLogFile();
 
     public:
         // Command IDs
         std::string versionId_;
 		std::string menuId_;
+		std::string dumpId_;
 
     private:
         // Plugin state
@@ -86,7 +89,10 @@ namespace rampAgent {
 		bool canSendReport_ = false;
         bool isConnected_ = false;
         bool m_stop;
+        bool printError = true;
 		std::string menuICAO_ = "LFPG"; //default airport for menu
+		std::filesystem::path configPath_;
+		nlohmann::ordered_json lastReportJson_;
 
         // APIs
         PluginMetadata metadata_;

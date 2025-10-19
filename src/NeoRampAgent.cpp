@@ -314,11 +314,9 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 		return nlohmann::ordered_json::object();
 	}
 
-	// HTTP (no TLS) to localhost:3000
-	httplib::Client cli("127.0.0.1", 3000);
-	cli.set_connection_timeout(2); // seconds
-	cli.set_read_timeout(5);
-	cli.set_write_timeout(5);
+	httplib::SSLClient cli(apiUrl_, 443);
+	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
+
 
 	auto res = cli.Post("/api/report", reportJson.dump(), "application/json");
 
@@ -345,12 +343,9 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 {
 	nlohmann::ordered_json assignedStandsJson = nlohmann::ordered_json::object();
-	// HTTP (no TLS) to localhost:3000
-	httplib::Client cli("127.0.0.1", 3000);
-	cli.set_connection_timeout(2); // seconds
-	cli.set_read_timeout(5);
-	cli.set_write_timeout(5);
-	httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
+	
+	httplib::SSLClient cli(apiUrl_, 443);
+	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
 	auto res = cli.Get("/api/occupancy/assigned", headers);
 
@@ -414,6 +409,12 @@ bool rampAgent::NeoRampAgent::dumpReportToLogFile()
 	content.push_back("Report:");
 	content.push_back(lastReportJson_.dump(4).empty() ? "{}" : lastReportJson_.dump(4));
 	return printToFile(content, fileName);
+}
+
+bool rampAgent::NeoRampAgent::changeApiUrl(const std::string& newUrl)
+{
+	apiUrl_ = newUrl;
+	return true;
 }
 
 void NeoRampAgent::runScopeUpdate() {

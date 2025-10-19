@@ -75,12 +75,14 @@ namespace rampAgent {
 		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
 		bool dumpReportToLogFile();
+		bool changeApiUrl(const std::string& newUrl);
 
     public:
         // Command IDs
         std::string versionId_;
 		std::string menuId_;
 		std::string dumpId_;
+		std::string urlId_;
 
     private:
         // Plugin state
@@ -94,6 +96,7 @@ namespace rampAgent {
 		std::filesystem::path configPath_;
 		nlohmann::ordered_json lastReportJson_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
+		std::string apiUrl_ = RAMPAGENT_API;
 
         // APIs
         PluginMetadata metadata_;

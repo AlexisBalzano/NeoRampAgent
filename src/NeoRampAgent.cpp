@@ -427,10 +427,17 @@ void NeoRampAgent::runScopeUpdate() {
 			logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");
 			printError = false; // avoid spamming logs
 		}
+		// Clear All Tag Items
+		for (const auto& [callsign, standName] : lastStandTagMap_) {
+			UpdateTagItems(callsign, "");
+		}
+		lastStandTagMap_.clear();
 		return;
 	}
 
 	updateStandMenuButtons(menuICAO_, assignedStands);
+
+	std::map<std::string, std::string> standTagMap;
 
 	auto& assigned = assignedStands["assignedStands"];
 	for (auto& stand : assigned) {
@@ -441,8 +448,25 @@ void NeoRampAgent::runScopeUpdate() {
 		}
 
 		std::string standName = stand["name"].get<std::string>();
+		standTagMap[callsign] = standName;
+
+		// Update only if changed or new
+		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end()) {
+			if (lastStandTagMap_[callsign] == standName) {
+				continue; // No change, skip
+			}
+		}
 		UpdateTagItems(callsign, standName);
 	}
+
+	// Clear tags for aircraft that are no longer assigned
+	for (const auto& [callsign, standName] : lastStandTagMap_) {
+		if (standTagMap.find(callsign) == standTagMap.end()) {
+			UpdateTagItems(callsign, "");
+		}
+	}
+
+	lastStandTagMap_ = standTagMap;
 }
 
 void rampAgent::NeoRampAgent::OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event)

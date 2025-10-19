@@ -3,7 +3,7 @@
 #include <thread>
 #include <vector>
 #include <nlohmann/json.hpp>
-
+#include <map>
 
 #include "NeoRadarSDK/SDK.h"
 #include "core/NeoRampAgentCommandProvider.h"
@@ -93,6 +93,7 @@ namespace rampAgent {
 		std::string menuICAO_ = "LFPG"; //default airport for menu
 		std::filesystem::path configPath_;
 		nlohmann::ordered_json lastReportJson_;
+		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 
         // APIs
         PluginMetadata metadata_;

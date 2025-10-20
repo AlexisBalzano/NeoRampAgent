@@ -461,13 +461,15 @@ void NeoRampAgent::runScopeUpdate() {
 		std::string standName = stand["name"].get<std::string>();
 		standTagMap[callsign] = standName;
 
+		std::string remark = stand.value("remark", "");
+
 		// Update only if changed or new
 		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end() && lastStandTagMap_[callsign] == standName) {
-			UpdateTagItems(callsign, WHITE, standName);
+			UpdateTagItems(callsign, WHITE, standName, remark);
 			continue;
 		}
 		else {
-			UpdateTagItems(callsign, YELLOW, standName);
+			UpdateTagItems(callsign, YELLOW, standName, remark);
 		}
 	}
 

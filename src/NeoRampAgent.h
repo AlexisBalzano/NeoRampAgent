@@ -123,11 +123,12 @@ namespace rampAgent {
         void unegisterCommand();
         void OnTagAction(const Tag::TagActionEvent* event) override;
         void OnTagDropdownAction(const Tag::DropdownActionEvent* event) override;
-        void UpdateTagItems(std::string Callsign, Colour colour = WHITE, std::string standName = "N/A");
+        void UpdateTagItems(std::string Callsign, Colour colour = WHITE, std::string standName = "", std::string remark = "");
         void updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands);
 
 	    // TAG Items IDs
 		std::string standTagId_;
+		std::string remarkTagId_;
         std::string standMenuId_;
 
         // TAG Action IDs

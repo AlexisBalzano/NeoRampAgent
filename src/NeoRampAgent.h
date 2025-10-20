@@ -74,8 +74,6 @@ namespace rampAgent {
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllAssignedStands(); //used to update tags when not sending reports
-		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
-        //nlohmann::ordered_json getAllStands(std::string icao);
 		std::string getMenuICAO() const { return menuICAO_; }
 		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
@@ -102,6 +100,7 @@ namespace rampAgent {
 		nlohmann::ordered_json lastReportJson_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 		std::string apiUrl_ = RAMPAGENT_API;
+        std::string callsign_;
 
         // APIs
         PluginMetadata metadata_;

@@ -150,13 +150,15 @@ bool rampAgent::NeoRampAgent::isConnected()
 
 bool rampAgent::NeoRampAgent::isController()
 {
+	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
 #ifdef DEV
+	callsign_ = connectionInfo->callsign;
 	return true;
 #endif // DEV
 
-	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
 	if (isConnected_) {
 		if (connectionInfo->facility >= Fsd::NetworkFacility::DEL) {
+			callsign_ = connectionInfo->callsign;
 			return true;
 		}
 	}
@@ -244,14 +246,12 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 	std::vector<Aircraft::Aircraft> airbornAircrafts;
 	for (const auto& ac : aircrafts) {
 		if (!ac.position.onGround || ac.position.groundSpeed != 0) {
-			std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
-			if (!fp.has_value()) continue; // Skip if no flightplan found
+			if (ac.position.altitude > 20000) continue; // Skip aircraft above 20,000 ft
 			airbornAircrafts.push_back(ac);
 		}
 	}
 
-	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
-	if (!connectionInfo.has_value()) {
+	if (!isConnected_) {
 		if (printError) {
 			printError = false; // avoid spamming logs
 			DisplayMessage("Not connected to FSD server. Cannot send report.", "NeoRampAgent");
@@ -261,7 +261,7 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 	}
 	std::string currentATC = connectionInfo->callsign;
 
-	reportJson["client"] = currentATC;
+	reportJson["client"] = callsign_;
 	reportJson["aircrafts"]["onGround"] = nlohmann::ordered_json::object();
 	reportJson["aircrafts"]["airborne"] = nlohmann::ordered_json::object();
 
@@ -284,6 +284,8 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 	for (const auto& ac : airbornAircrafts) {
 		std::string callsign = toUpper(ac.callsign);
 		std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
+		if (!fp.has_value()) continue; // Skip if no flightplan found
+		if (fp->destination.substr(0, 2) != "LF") continue; // Skip if destination is not in France
 		std::string origin = "N/A";
 		std::string destination = "N/A";
 		std::string aircraftType = "ZZZZ";

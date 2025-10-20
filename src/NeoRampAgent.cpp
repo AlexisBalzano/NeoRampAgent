@@ -259,7 +259,6 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 		}
 		return;
 	}
-	std::string currentATC = connectionInfo->callsign;
 
 	reportJson["client"] = callsign_;
 	reportJson["aircrafts"]["onGround"] = nlohmann::ordered_json::object();
@@ -446,6 +445,12 @@ void NeoRampAgent::runScopeUpdate() {
 	std::map<std::string, std::string> standTagMap;
 
 	auto& assigned = assignedStands["assignedStands"];
+	assignedStands["assignedStands"].insert(
+		assignedStands["assignedStands"].end(),
+		assignedStands["occupiedStands"].begin(),
+		assignedStands["occupiedStands"].end()
+	); // display tag item on occupied stands as well
+
 	for (auto& stand : assigned) {
 		std::string callsign = stand["callsign"].get<std::string>();
 		std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);

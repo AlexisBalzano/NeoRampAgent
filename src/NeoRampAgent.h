@@ -22,7 +22,7 @@ namespace rampAgent {
     };
 
     typedef std::optional<std::array<unsigned int, 3>> Colour;
-    inline Colour ORANGE = std::array<unsigned int, 3>({ 255, 153, 51 });
+    inline Colour YELLOW = std::array<unsigned int, 3>({ 255, 220, 3 });
     inline Colour WHITE = std::array<unsigned int, 3>({ 255, 255, 255 });
 
 

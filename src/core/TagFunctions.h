@@ -81,6 +81,30 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
         logger_->error("Failed to send manual assign to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
         return;
     }
+    else { // assignement processed, check response to see if successful and update tag item if so
+        if (!res->body.empty()) {
+            nlohmann::ordered_json dataJson = nlohmann::ordered_json::parse(res->body);
+			if (!dataJson.contains("message")) return; // malformed response
+            if (dataJson["message"]["action"].get<std::string>() == "assign") {
+                logger_->info("Manual stand assignment successful: " + standName + " to " + event->callsign);
+				lastStandTagMap_[event->callsign] = standName;
+				UpdateTagItems(event->callsign, WHITE, standName);
+                return;
+            }
+            else if (dataJson["message"]["action"].get<std::string>() == "free") {
+                logger_->info("Freed stand assignment for: " + event->callsign);
+				lastStandTagMap_.erase(event->callsign);
+				UpdateTagItems(event->callsign, WHITE, "");
+                return;
+            }
+            else {
+				logger_->info("Manual stand rejected: " + dataJson["message"]["message"].get<std::string>());
+                DisplayMessage("Manual stand rejected: " + dataJson["message"]["message"].get<std::string>());
+                return;
+            }
+        }
+    }
+	DisplayMessage("Manual stand assignment failed for " + event->callsign + " to " + standName, "");
 }
 
 void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string &actionId, const std::string &userInput)

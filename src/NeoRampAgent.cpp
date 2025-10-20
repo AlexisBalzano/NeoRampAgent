@@ -467,7 +467,7 @@ void NeoRampAgent::runScopeUpdate() {
 			continue;
 		}
 		else {
-			UpdateTagItems(callsign, ORANGE, standName);
+			UpdateTagItems(callsign, YELLOW, standName);
 		}
 	}
 

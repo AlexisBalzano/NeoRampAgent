@@ -56,14 +56,8 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 
 	logger_->info("Trying to manually assign: " + event->componentId + " to: " + event->callsign);
 
-    // HTTP (no TLS) to localhost:3000
-    httplib::Client cli("127.0.0.1", 3000);
-    cli.set_connection_timeout(2); // seconds
-    cli.set_read_timeout(5);
-    cli.set_write_timeout(5);
-    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-	std::string standName = event->componentId;
+   	std::string standName = event->componentId;
 	std::string icao = menuICAO_;
     
 	std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(event->callsign);
@@ -77,7 +71,11 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 		return;
     }
 
-    auto res = cli.Get("/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign, headers);
+    httplib::SSLClient cli(apiUrl_);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
+    std::string apiEndpoint = "/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
+
+    auto res = cli.Get(apiEndpoint.c_str(), headers);
 
     if (!res || !(res->status >= 200 && res->status < 300)) {
         logger_->error("Failed to send manual assign to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
@@ -96,14 +94,12 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 	}
 	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
 	logger_->info("Updating stand menu for airport " + icao);
-    // HTTP (no TLS) to localhost:3000
-    httplib::Client cli("127.0.0.1", 3000);
-    cli.set_connection_timeout(2); // seconds
-    cli.set_read_timeout(5);
-    cli.set_write_timeout(5);
-    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-    auto res = cli.Get("/api/airports/" + icao + "/stands", headers);
+    httplib::SSLClient cli(apiUrl_);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
+    std::string apiEndpoint = "/api/airports/" + icao + "/stands";
+
+    auto res = cli.Get(apiEndpoint.c_str(), headers);
 
     if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success

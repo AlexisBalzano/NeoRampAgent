@@ -25,14 +25,11 @@ void NeoRampAgent::RegisterTagItems()
 
 
 // TAG ITEM UPDATE FUNCTIONS
-void NeoRampAgent::UpdateTagItems(std::string callsign, std::string standName) {
+void NeoRampAgent::UpdateTagItems(std::string callsign, Colour colour, std::string standName) {
     Tag::TagContext tagContext;
 	tagContext.callsign = callsign;
+    tagContext.colour = colour;
 	std::string stand = standName;
     tagInterface_->UpdateTagValue(standTagId_, stand, tagContext);
-}
-
-// Update all tag items for all pilots
-void NeoRampAgent::UpdateTagItems() {
 }
 }  // namespace rampAgent

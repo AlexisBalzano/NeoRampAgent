@@ -252,8 +252,11 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 
 	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
 	if (!connectionInfo.has_value()) {
-		DisplayMessage("Not connected to FSD server. Cannot send report.", "NeoRampAgent");
-		logger_->log(Logger::LogLevel::Warning, "Not connected to FSD server. Cannot send report.");
+		if (printError) {
+			printError = false; // avoid spamming logs
+			DisplayMessage("Not connected to FSD server. Cannot send report.", "NeoRampAgent");
+			logger_->log(Logger::LogLevel::Warning, "Not connected to FSD server. Cannot send report.");
+		}
 		return;
 	}
 	std::string currentATC = connectionInfo->callsign;
@@ -430,7 +433,7 @@ void NeoRampAgent::runScopeUpdate() {
 		}
 		// Clear All Tag Items
 		for (const auto& [callsign, standName] : lastStandTagMap_) {
-			UpdateTagItems(callsign, "");
+			UpdateTagItems(callsign, WHITE, "");
 		}
 		lastStandTagMap_.clear();
 		return;
@@ -452,18 +455,19 @@ void NeoRampAgent::runScopeUpdate() {
 		standTagMap[callsign] = standName;
 
 		// Update only if changed or new
-		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end()) {
-			if (lastStandTagMap_[callsign] == standName) {
-				continue; // No change, skip
-			}
+		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end() && lastStandTagMap_[callsign] == standName) {
+			UpdateTagItems(callsign, WHITE, standName);
+			continue;
 		}
-		UpdateTagItems(callsign, standName);
+		else {
+			UpdateTagItems(callsign, ORANGE, standName);
+		}
 	}
 
 	// Clear tags for aircraft that are no longer assigned
 	for (const auto& [callsign, standName] : lastStandTagMap_) {
 		if (standTagMap.find(callsign) == standTagMap.end()) {
-			UpdateTagItems(callsign, "");
+			UpdateTagItems(callsign, WHITE, "");
 		}
 	}
 

@@ -18,8 +18,13 @@ namespace rampAgent {
     struct Stand {
         std::string name;
         std::string icao;
-        bool occupied;
+        bool occupied = false;
     };
+
+    typedef std::optional<std::array<unsigned int, 3>> Colour;
+    inline Colour ORANGE = std::array<unsigned int, 3>({ 255, 153, 51 });
+    inline Colour WHITE = std::array<unsigned int, 3>({ 255, 255, 255 });
+
 
     class NeoRampAgentCommandProvider;
 
@@ -119,8 +124,7 @@ namespace rampAgent {
         void unegisterCommand();
         void OnTagAction(const Tag::TagActionEvent* event) override;
         void OnTagDropdownAction(const Tag::DropdownActionEvent* event) override;
-        void UpdateTagItems();
-        void UpdateTagItems(std::string Callsign, std::string standName = "N/A");
+        void UpdateTagItems(std::string Callsign, Colour colour = WHITE, std::string standName = "N/A");
         void updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands);
 
 	    // TAG Items IDs

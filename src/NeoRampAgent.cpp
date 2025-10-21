@@ -234,18 +234,14 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 	// need to retrieve all aircraft in range and format json report
 	std::vector<Aircraft::Aircraft> aircrafts = aircraftAPI_->getAll();
 
-	// Filter for ground aircraft
+	// Filter for ground aircraft & airborn aircrafts
 	std::vector<Aircraft::Aircraft> groundAircrafts;
-	for (const auto& ac : aircrafts) {
-		if (ac.position.onGround && ac.position.groundSpeed == 0) {
-			groundAircrafts.push_back(ac);
-		}
-	}
-
-	// Filter for airborn aircraft
 	std::vector<Aircraft::Aircraft> airbornAircrafts;
 	for (const auto& ac : aircrafts) {
-		if (!ac.position.onGround || ac.position.groundSpeed != 0) {
+		if (ac.position.groundSpeed == 0) {
+			groundAircrafts.push_back(ac);
+		}
+		else {
 			if (ac.position.altitude > 20000) continue; // Skip aircraft above 20,000 ft
 			airbornAircrafts.push_back(ac);
 		}
@@ -288,11 +284,9 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 		std::string origin = "N/A";
 		std::string destination = "N/A";
 		std::string aircraftType = "ZZZZ";
-		if (fp.has_value()) {
-			origin = toUpper(fp->origin);
-			destination = toUpper(fp->destination);
-			aircraftType = toUpper(fp->acType);
-		}
+		origin = toUpper(fp->origin);
+		destination = toUpper(fp->destination);
+		aircraftType = toUpper(fp->acType);
 
 		std::optional<double> distOpt = aircraftAPI_->getDistanceToDestination(ac.callsign);
 		double dist = distOpt.value_or(-1);

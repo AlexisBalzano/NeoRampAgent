@@ -316,7 +316,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
 
-	auto res = cli.Post("/api/report", reportJson.dump(), "application/json");
+	auto res = cli.Post("/rampagent/api/report", reportJson.dump(), "application/json");
 
 	if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success
@@ -345,7 +345,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 	httplib::SSLClient cli(apiUrl_, 443);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
-	auto res = cli.Get("/api/occupancy/assigned", headers);
+	auto res = cli.Get("/rampagent/api/occupancy/assigned", headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success
@@ -366,7 +366,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 		return nlohmann::ordered_json::object();
 	}
 
-	auto res = cli.Get("/api/occupancy/occupied", headers);
+	res = cli.Get("/rampagent/api/occupancy/occupied", headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success

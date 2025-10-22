@@ -73,7 +73,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-    std::string apiEndpoint = "/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
+    std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
 
@@ -121,7 +121,7 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-    std::string apiEndpoint = "/api/airports/" + icao + "/stands";
+    std::string apiEndpoint = "/rampagent/api/airports/" + icao + "/stands";
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
 

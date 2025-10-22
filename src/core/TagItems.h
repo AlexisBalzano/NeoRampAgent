@@ -18,7 +18,7 @@ void NeoRampAgent::RegisterTagItems()
 
     // Tag item def
     tagDef.name = "STAND";
-    tagDef.defaultValue = "N/A";
+    tagDef.defaultValue = "";
     std::string tagID = tagInterface_->RegisterTagItem(tagDef);
     standTagId_ = tagID;
 

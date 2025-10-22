@@ -351,6 +351,27 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 		printError = true; // reset error printing flag on success
 		try {
 			if (!res->body.empty()) assignedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+		}
+		catch (const std::exception& e) {
+			logger_->error("Failed to parse assigned stands data from NeoRampAgent server: " + std::string(e.what()));
+			return nlohmann::ordered_json::object();
+		}
+	}
+	else {
+		if (printError) {
+			printError = false; // avoid spamming logs
+			DisplayMessage("Failed to retrieve assigned stands data from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0), "");
+			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+		}
+		return nlohmann::ordered_json::object();
+	}
+
+	auto res = cli.Get("/api/occupancy/occupied", headers);
+
+	if (res && res->status >= 200 && res->status < 300) {
+		printError = true; // reset error printing flag on success
+		try {
+			if (!res->body.empty()) assignedStandsJson["occupiedStands"] = nlohmann::ordered_json::parse(res->body);
 			return assignedStandsJson;
 		}
 		catch (const std::exception& e) {

@@ -9,7 +9,7 @@
 #include "core/NeoRampAgentCommandProvider.h"
 
 constexpr const char* NEORAMPAGENT_VERSION = "v1.0.0";
-constexpr const char* RAMPAGENT_API = "https://pintade.vatsim.fr";
+constexpr const char* RAMPAGENT_API = "pintade.vatsim.fr";
 
 using namespace PluginSDK;
 

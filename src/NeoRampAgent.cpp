@@ -151,6 +151,9 @@ bool rampAgent::NeoRampAgent::isConnected()
 bool rampAgent::NeoRampAgent::isController()
 {
 	std::optional<Fsd::ConnectionInfo> connectionInfo = fsdAPI_->getConnection();
+	if (!connectionInfo.has_value()) {
+		return false;
+	}
 #ifdef DEV
 	callsign_ = connectionInfo->callsign;
 	return true;

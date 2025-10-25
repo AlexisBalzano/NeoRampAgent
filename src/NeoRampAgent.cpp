@@ -35,6 +35,8 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 	tagInterface_ = lcoreAPI->tag().getInterface();
 	packageAPI_ = &lcoreAPI->package();
 
+	logger_->info("Initializing NeoRampAgent version " + std::string(NEORAMPAGENT_VERSION));
+
 #ifndef DEV
 	std::pair<bool, std::string> updateAvailable = newVersionAvailable();
 	if (updateAvailable.first) {
@@ -42,11 +44,18 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 	}
 #endif // !DEV
 
+	logger_->info("Version checked");
+
 	try
 	{
+		logger_->info("Registering Tag Items");
 		this->RegisterTagItems();
+		logger_->info("Registering Tag Actions");
 		this->RegisterTagActions();
+		logger_->info("Registering Commands");
 		this->RegisterCommand();
+
+		logger_->info("Initialising NeoRampAgent state");
 
 		initialized_ = true;
 		isConnected_ = isConnected();

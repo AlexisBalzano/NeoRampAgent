@@ -115,7 +115,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 		return;
 	}
 	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
-	logger_->info("Updating stand menu for airport " + icao);
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
@@ -131,7 +130,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         }
         catch (const std::exception& e) {
             logger_->error("Failed to parse stands data from NeoRampAgent server: " + std::string(e.what()));
-            return;
         }
     }
     else {
@@ -139,7 +137,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
             printError = false; // avoid spamming logs
             logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
 		}
-        return;
     }
 
     if (standsJson.empty()) {
@@ -147,7 +144,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
             printError = false; // avoid spamming logs
             logger_->error("No stands data received from NeoRampAgent server for airport " + icao);
         }
-        return;
 	}
 #else
     logger_->error("Cannot update stand menu - HTTP client not supported (OpenSSL required).");
@@ -229,7 +225,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 
 bool NeoRampAgent::OnTagShowDropdown(const std::string& actionId, const std::string& callsign)
 {
-	logger_->info("OnTagShowDropdown called for actionId: " + actionId + ", callsign: " + callsign);
     if (!initialized_) return false;
     if (actionId != standMenuId_) return false;
 

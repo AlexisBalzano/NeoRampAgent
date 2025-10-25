@@ -71,6 +71,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 		return;
     }
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
     std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
@@ -104,6 +105,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
             }
         }
     }
+#endif // CPPHTTPLIB_OPENSSL_SUPPORT
 	DisplayMessage("Manual stand assignment failed for " + event->callsign + " to " + standName, "");
 }
 
@@ -119,6 +121,7 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
 	logger_->info("Updating stand menu for airport " + icao);
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
     std::string apiEndpoint = "/rampagent/api/airports/" + icao + "/stands";
@@ -150,6 +153,10 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         }
         return;
 	}
+#else
+    logger_->error("Cannot update stand menu - HTTP client not supported (OpenSSL required).");
+	return;
+#endif // CPPHTTPLIB_OPENSSL_SUPPORT
 
 	// deduct available stands list from all stands + occupied stands + blocked stands
     std::vector<Stand> availableStands;

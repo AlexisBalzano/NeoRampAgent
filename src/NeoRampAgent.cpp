@@ -35,33 +35,29 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 	tagInterface_ = lcoreAPI->tag().getInterface();
 	packageAPI_ = &lcoreAPI->package();
 
-	logger_->info("Initializing NeoRampAgent version " + std::string(NEORAMPAGENT_VERSION));
-
 #ifndef DEV
-	std::pair<bool, std::string> updateAvailable = newVersionAvailable();
-	if (updateAvailable.first) {
-		DisplayMessage("A new version of NeoRampAgent is available: " + updateAvailable.second + " (current version: " + NEORAMPAGENT_VERSION + ")", "");
+	try {
+		std::pair<bool, std::string> updateAvailable = newVersionAvailable();
+		if (updateAvailable.first) {
+			DisplayMessage("A new version of NeoRampAgent is available: " + updateAvailable.second + " (current version: " + NEORAMPAGENT_VERSION + ")", "");
+		}
+	} catch (const std::exception& e) {
+		logger_->error("Error checking for updates: " + std::string(e.what()));
 	}
 #endif // !DEV
 
-	logger_->info("Version checked");
 
 	try
 	{
-		logger_->info("Registering Tag Items");
 		this->RegisterTagItems();
-		logger_->info("Registering Tag Actions");
 		this->RegisterTagActions();
-		logger_->info("Registering Commands");
 		this->RegisterCommand();
-
-		logger_->info("Initialising NeoRampAgent state");
 
 		initialized_ = true;
 		isConnected_ = isConnected();
 		canSendReport_ = isController();
 		configPath_ = clientInfo_.documentsPath;
-		LOG_DEBUG(Logger::LogLevel::Info, "NeoRampAgent initialized successfully");
+		logger_->info("NeoRampAgent initialized successfully");
 	}
 	catch (const std::exception& e)
 	{
@@ -74,6 +70,7 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 
 std::pair<bool, std::string> rampAgent::NeoRampAgent::newVersionAvailable()
 {
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 	httplib::SSLClient cli("api.github.com");
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"} };
 	std::string apiEndpoint = "/repos/AlexisBalzano/NeoRampAgent/releases/latest";
@@ -103,6 +100,10 @@ std::pair<bool, std::string> rampAgent::NeoRampAgent::newVersionAvailable()
 		logger_->error("Failed to check for NeoRampAgent updates. HTTP status: " + std::to_string(res ? res->status : 0));
 		return { false, "" };
 	}
+#else
+	logger_->warning("OpenSSL not available; skipping online version check.");
+	return { false, "" };
+#endif
 }
 
 void NeoRampAgent::Shutdown()
@@ -115,7 +116,9 @@ void NeoRampAgent::Shutdown()
 
 
 	this->m_stop = true;
-	this->m_worker.join();
+	if (this->m_worker.joinable()) {
+		this->m_worker.join();
+	}
 
 	this->unegisterCommand();
 }
@@ -144,7 +147,8 @@ void NeoRampAgent::run() {
 
 std::string rampAgent::NeoRampAgent::toUpper(std::string str)
 {
-	std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+	std::transform(str.begin(), str.end(), str.begin(),
+		[](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 	return str;
 }
 
@@ -324,6 +328,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 		return nlohmann::ordered_json::object();
 	}
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 	httplib::SSLClient cli(apiUrl_, 443);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
@@ -347,6 +352,9 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
 			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
 		}
 	}
+#else
+	logger_->warning("OpenSSL not available; cannot send report to NeoRampAgent server.");
+#endif
 	return nlohmann::ordered_json::object();
 }
 
@@ -354,6 +362,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 {
 	nlohmann::ordered_json assignedStandsJson = nlohmann::ordered_json::object();
 	
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 	httplib::SSLClient cli(apiUrl_, 443);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
@@ -398,6 +407,9 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
 		}
 	}
+#else
+	logger_->warning("OpenSSL not available; cannot retrieve assigned stands from NeoRampAgent server.");
+#endif // #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 	return nlohmann::ordered_json::object();
 }
 

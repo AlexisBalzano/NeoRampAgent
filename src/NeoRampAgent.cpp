@@ -49,8 +49,8 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 
 	try
 	{
-		this->RegisterTagItems();
 		this->RegisterTagActions();
+		this->RegisterTagItems();
 		this->RegisterCommand();
 
 		initialized_ = true;
@@ -461,11 +461,12 @@ bool rampAgent::NeoRampAgent::changeApiUrl(const std::string& newUrl)
 }
 
 void NeoRampAgent::runScopeUpdate() {
-	nlohmann::ordered_json assignedStands;
-	if (canSendReport_) assignedStands = sendReport(); // Use response to update tags
-	else assignedStands = getAllAssignedStands();
+	std::lock_guard<std::mutex> lock(reportMutex_);
 
-	if (assignedStands.empty()) {
+	if (canSendReport_) lastOccupiedStands_ = sendReport(); // Use response to update tags
+	else lastOccupiedStands_ = getAllAssignedStands();
+
+	if (lastOccupiedStands_.empty()) {
 		if (printError) {
 			DisplayMessage("No occupied stands data received to update tags.", "");
 			logger_->log(Logger::LogLevel::Warning, "No occupied stands data received to update tags.");
@@ -479,15 +480,13 @@ void NeoRampAgent::runScopeUpdate() {
 		return;
 	}
 
-	updateStandMenuButtons(menuICAO_, assignedStands);
-
 	std::map<std::string, std::string> standTagMap;
 
-	auto& assigned = assignedStands["assignedStands"];
-	assignedStands["assignedStands"].insert(
-		assignedStands["assignedStands"].end(),
-		assignedStands["occupiedStands"].begin(),
-		assignedStands["occupiedStands"].end()
+	auto& assigned = lastOccupiedStands_["assignedStands"];
+	lastOccupiedStands_["assignedStands"].insert(
+		lastOccupiedStands_["assignedStands"].end(),
+		lastOccupiedStands_["occupiedStands"].begin(),
+		lastOccupiedStands_["occupiedStands"].end()
 	); // display tag item on occupied stands as well
 
 	for (auto& stand : assigned) {

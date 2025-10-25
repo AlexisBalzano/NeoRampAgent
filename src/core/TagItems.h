@@ -19,6 +19,7 @@ void NeoRampAgent::RegisterTagItems()
     // Tag item def
     tagDef.name = "STAND";
     tagDef.defaultValue = "";
+    tagDef.allowedActions = { standMenuId_ };
     std::string tagID = tagInterface_->RegisterTagItem(tagDef);
     standTagId_ = tagID;
 

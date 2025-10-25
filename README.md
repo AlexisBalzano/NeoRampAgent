@@ -15,5 +15,4 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
 # Commands
 Available commands to interact with the plugin:
 - `.rampAgent version`: Display the current version of the plugin
-- `.rampAgent menu <ICAO>`: Change stand menu ICAO to specified airport.
 - `.rampAgent dump`: Dump latest report to log file

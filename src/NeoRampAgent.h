@@ -2,6 +2,7 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <map>
 
@@ -47,6 +48,7 @@ namespace rampAgent {
         // Scope events
 		virtual void OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event) override;
         void OnTimer(int Counter);
+        virtual bool OnTagShowDropdown(const std::string& actionId, const std::string& callsign) override;
 
         // Command handling
         void TagProcessing(const std::string& callsign, const std::string& actionId, const std::string& userInput = "");
@@ -74,8 +76,6 @@ namespace rampAgent {
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllAssignedStands(); //used to update tags when not sending reports
-		std::string getMenuICAO() const { return menuICAO_; }
-		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
 		bool dumpReportToLogFile();
 		bool changeApiUrl(const std::string& newUrl);
@@ -83,7 +83,6 @@ namespace rampAgent {
     public:
         // Command IDs
         std::string versionId_;
-		std::string menuId_;
 		std::string dumpId_;
 		std::string urlId_;
 
@@ -95,9 +94,10 @@ namespace rampAgent {
         bool isConnected_ = false;
         bool m_stop;
         bool printError = true;
-		std::string menuICAO_ = "LFPG"; //default airport for menu
 		std::filesystem::path configPath_;
 		nlohmann::ordered_json lastReportJson_;
+		nlohmann::ordered_json lastOccupiedStands_;
+		std::mutex reportMutex_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 		std::string apiUrl_ = RAMPAGENT_API;
         std::string callsign_;

@@ -8,6 +8,7 @@ void NeoRampAgent::RegisterTagActions()
     PluginSDK::Tag::TagActionDefinition tagDef;
     tagDef.name = "StandMenu";
     tagDef.description = "open the stand menu";
+    tagDef.requiresInput = false;
     standMenuId_ = tagInterface_->RegisterTagAction(tagDef);
 
     PluginSDK::Tag::DropdownDefinition dropdownDef;
@@ -20,9 +21,9 @@ void NeoRampAgent::RegisterTagActions()
 
     style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
-    dropdownComponent.id = "STAND1";
+    dropdownComponent.id = "None";
     dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-    dropdownComponent.text = "48A";
+    dropdownComponent.text = "None";
     dropdownComponent.requiresInput = false;
     dropdownComponent.style = style;
     dropdownDef.components.push_back(dropdownComponent);
@@ -58,18 +59,13 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 
 
    	std::string standName = event->componentId;
-	std::string icao = menuICAO_;
     
 	std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(event->callsign);
 	if (!fpOpt) {
 		logger_->error("No flightplan found for " + event->callsign + " during manual stand assignment.");
 		return;
 	}
-
-    if (icao != fpOpt->destination) {
-		logger_->warning("Assigned stand " + standName + " at " + icao + " does not match flightplan destination " + fpOpt->destination + " for " + event->callsign);
-		return;
-    }
+	std::string icao = fpOpt->destination;
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
@@ -229,6 +225,23 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     dropdownDef.components.push_back(scrollArea);
 
     tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
+}
+
+bool NeoRampAgent::OnTagShowDropdown(const std::string& actionId, const std::string& callsign)
+{
+	logger_->info("OnTagShowDropdown called for actionId: " + actionId + ", callsign: " + callsign);
+    if (!initialized_) return false;
+    if (actionId != standMenuId_) return false;
+
+    std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(callsign);
+    if (!fpOpt) {
+        logger_->error("No flightplan found for " + callsign + " during stand menu update.");
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(reportMutex_);
+    updateStandMenuButtons(fpOpt->destination, lastOccupiedStands_);
+    return true;
 }
 
 }  // namespace rampAgent

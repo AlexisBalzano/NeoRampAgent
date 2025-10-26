@@ -66,6 +66,9 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 std::pair<bool, std::string> rampAgent::NeoRampAgent::newVersionAvailable()
 {
 	httplib::SSLClient cli("api.github.com");
+	cli.set_connection_timeout(2); // seconds
+	cli.set_read_timeout(5);
+	cli.set_write_timeout(5);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"} };
 	std::string apiEndpoint = "/repos/AlexisBalzano/NeoRampAgent/releases/latest";
 

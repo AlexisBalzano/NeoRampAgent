@@ -18,21 +18,24 @@ void NeoRampAgent::RegisterTagItems()
 
     // Tag item def
     tagDef.name = "STAND";
-    tagDef.defaultValue = "N/A";
+    tagDef.defaultValue = "";
+    tagDef.allowedActions = { standMenuId_ };
     std::string tagID = tagInterface_->RegisterTagItem(tagDef);
     standTagId_ = tagID;
+
+    tagDef.name = "REMARK";
+    tagDef.defaultValue = "";
+    tagID = tagInterface_->RegisterTagItem(tagDef);
+    remarkTagId_ = tagID;
 }
 
 
 // TAG ITEM UPDATE FUNCTIONS
-void NeoRampAgent::UpdateTagItems(std::string callsign, std::string standName) {
+void NeoRampAgent::UpdateTagItems(std::string callsign, Colour colour, std::string standName, std::string remark) {
     Tag::TagContext tagContext;
 	tagContext.callsign = callsign;
-	std::string stand = standName;
-    tagInterface_->UpdateTagValue(standTagId_, stand, tagContext);
-}
-
-// Update all tag items for all pilots
-void NeoRampAgent::UpdateTagItems() {
+    tagContext.colour = colour;
+    tagInterface_->UpdateTagValue(standTagId_, standName, tagContext);
+    tagInterface_->UpdateTagValue(remarkTagId_, remark, tagContext);
 }
 }  // namespace rampAgent

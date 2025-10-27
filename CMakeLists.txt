@@ -39,6 +39,7 @@ include_directories(
 )
 
 # Find external dependencies
+find_package(httplib CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 
@@ -58,6 +59,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES}  "")
 # Link dependencies
 target_link_libraries(${PROJECT_NAME} PRIVATE 
     nlohmann_json::nlohmann_json
+    httplib::httplib
     OpenSSL::SSL
     OpenSSL::Crypto
     NeoRadarSDK::NeoRadarSDK

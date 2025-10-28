@@ -65,6 +65,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     NeoRadarSDK::NeoRadarSDK
 )
 
+# Link Apple frameworks required by httplib's macOS code path
+if(APPLE)
+    # Prefer explicit framework flags for portability on CI / Xcode
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework CoreFoundation" "-framework CFNetwork")
+endif()
+
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/External/httplib)
 target_compile_definitions(${PROJECT_NAME} PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
 

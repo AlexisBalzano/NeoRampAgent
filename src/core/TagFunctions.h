@@ -8,6 +8,7 @@ void NeoRampAgent::RegisterTagActions()
     PluginSDK::Tag::TagActionDefinition tagDef;
     tagDef.name = "StandMenu";
     tagDef.description = "open the stand menu";
+    tagDef.requiresInput = false;
     standMenuId_ = tagInterface_->RegisterTagAction(tagDef);
 
     PluginSDK::Tag::DropdownDefinition dropdownDef;
@@ -20,9 +21,9 @@ void NeoRampAgent::RegisterTagActions()
 
     style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
-    dropdownComponent.id = "STAND1";
+    dropdownComponent.id = "None";
     dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
-    dropdownComponent.text = "48A";
+    dropdownComponent.text = "None";
     dropdownComponent.requiresInput = false;
     dropdownComponent.style = style;
     dropdownDef.components.push_back(dropdownComponent);
@@ -56,33 +57,52 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 
 	logger_->info("Trying to manually assign: " + event->componentId + " to: " + event->callsign);
 
-    // HTTP (no TLS) to localhost:3000
-    httplib::Client cli("127.0.0.1", 3000);
-    cli.set_connection_timeout(2); // seconds
-    cli.set_read_timeout(5);
-    cli.set_write_timeout(5);
-    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-	std::string standName = event->componentId;
-	std::string icao = menuICAO_;
+   	std::string standName = event->componentId;
     
 	std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(event->callsign);
 	if (!fpOpt) {
 		logger_->error("No flightplan found for " + event->callsign + " during manual stand assignment.");
 		return;
 	}
+	std::string icao = fpOpt->destination;
 
-    if (icao != fpOpt->destination) {
-		logger_->warning("Assigned stand " + standName + " at " + icao + " does not match flightplan destination " + fpOpt->destination + " for " + event->callsign);
-		return;
-    }
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    httplib::SSLClient cli(apiUrl_);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
+    std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
 
-    auto res = cli.Get("/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign, headers);
+    auto res = cli.Get(apiEndpoint.c_str(), headers);
 
     if (!res || !(res->status >= 200 && res->status < 300)) {
         logger_->error("Failed to send manual assign to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
         return;
     }
+    else { // assignement processed, check response to see if successful and update tag item if so
+        if (!res->body.empty()) {
+            nlohmann::ordered_json dataJson = nlohmann::ordered_json::parse(res->body);
+			if (!dataJson.contains("message")) return; // malformed response
+            if (dataJson["message"]["action"].get<std::string>() == "assign") {
+                logger_->info("Manual stand assignment successful: " + standName + " to " + event->callsign);
+				lastStandTagMap_[event->callsign] = standName;
+				UpdateTagItems(event->callsign, WHITE, standName);
+                return;
+            }
+            else if (dataJson["message"]["action"].get<std::string>() == "free") {
+                logger_->info("Freed stand assignment for: " + event->callsign);
+				lastStandTagMap_.erase(event->callsign);
+				UpdateTagItems(event->callsign, WHITE, "");
+                return;
+            }
+            else {
+				logger_->info("Manual stand rejected: " + dataJson["message"]["message"].get<std::string>());
+                DisplayMessage("Manual stand rejected: " + dataJson["message"]["message"].get<std::string>());
+                return;
+            }
+        }
+    }
+#endif // CPPHTTPLIB_OPENSSL_SUPPORT
+	DisplayMessage("Manual stand assignment failed for " + event->callsign + " to " + standName, "");
 }
 
 void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string &actionId, const std::string &userInput)
@@ -95,15 +115,13 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 		return;
 	}
 	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
-	logger_->info("Updating stand menu for airport " + icao);
-    // HTTP (no TLS) to localhost:3000
-    httplib::Client cli("127.0.0.1", 3000);
-    cli.set_connection_timeout(2); // seconds
-    cli.set_read_timeout(5);
-    cli.set_write_timeout(5);
-    httplib::Headers headers = { {"User-Agent", "NeoRampAgentVersionChecker"}, {"Accept", "application/json"} };
 
-    auto res = cli.Get("/api/airports/" + icao + "/stands", headers);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    httplib::SSLClient cli(apiUrl_);
+    httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
+    std::string apiEndpoint = "/rampagent/api/airports/" + icao + "/stands";
+
+    auto res = cli.Get(apiEndpoint.c_str(), headers);
 
     if (res && res->status >= 200 && res->status < 300) {
 		printError = true; // reset error printing flag on success
@@ -112,7 +130,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         }
         catch (const std::exception& e) {
             logger_->error("Failed to parse stands data from NeoRampAgent server: " + std::string(e.what()));
-            return;
         }
     }
     else {
@@ -120,7 +137,6 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
             printError = false; // avoid spamming logs
             logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
 		}
-        return;
     }
 
     if (standsJson.empty()) {
@@ -128,8 +144,11 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
             printError = false; // avoid spamming logs
             logger_->error("No stands data received from NeoRampAgent server for airport " + icao);
         }
-        return;
 	}
+#else
+    logger_->error("Cannot update stand menu - HTTP client not supported (OpenSSL required).");
+	return;
+#endif // CPPHTTPLIB_OPENSSL_SUPPORT
 
 	// deduct available stands list from all stands + occupied stands + blocked stands
     std::vector<Stand> availableStands;
@@ -202,6 +221,22 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     dropdownDef.components.push_back(scrollArea);
 
     tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
+}
+
+bool NeoRampAgent::OnTagShowDropdown(const std::string& actionId, const std::string& callsign)
+{
+    if (!initialized_) return false;
+    if (actionId != standMenuId_) return false;
+
+    std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(callsign);
+    if (!fpOpt) {
+        logger_->error("No flightplan found for " + callsign + " during stand menu update.");
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(reportMutex_);
+    updateStandMenuButtons(fpOpt->destination, lastOccupiedStands_);
+    return true;
 }
 
 }  // namespace rampAgent

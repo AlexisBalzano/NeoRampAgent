@@ -2,14 +2,15 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <map>
 
 #include "NeoRadarSDK/SDK.h"
 #include "core/NeoRampAgentCommandProvider.h"
 
-constexpr const char* NEORAMPAGENT_VERSION = "v0.0.1";
-constexpr const char* RAMPAGENT_API = "";
+constexpr const char* NEORAMPAGENT_VERSION = "v1.0.1";
+constexpr const char* RAMPAGENT_API = "pintade.vatsim.fr";
 
 using namespace PluginSDK;
 
@@ -18,8 +19,13 @@ namespace rampAgent {
     struct Stand {
         std::string name;
         std::string icao;
-        bool occupied;
+        bool occupied = false;
     };
+
+    typedef std::optional<std::array<unsigned int, 3>> Colour;
+    inline Colour YELLOW = std::array<unsigned int, 3>({ 255, 220, 3 });
+    inline Colour WHITE = std::array<unsigned int, 3>({ 255, 255, 255 });
+
 
     class NeoRampAgentCommandProvider;
 
@@ -42,6 +48,7 @@ namespace rampAgent {
         // Scope events
 		virtual void OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event) override;
         void OnTimer(int Counter);
+        virtual bool OnTagShowDropdown(const std::string& actionId, const std::string& callsign) override;
 
         // Command handling
         void TagProcessing(const std::string& callsign, const std::string& actionId, const std::string& userInput = "");
@@ -69,18 +76,15 @@ namespace rampAgent {
         void generateReport(nlohmann::ordered_json& reportJson);
         nlohmann::ordered_json sendReport();
         nlohmann::ordered_json getAllAssignedStands(); //used to update tags when not sending reports
-		//void assignStandToAircraft(std::string callsign, std::string standName, std::string icao);
-        //nlohmann::ordered_json getAllStands(std::string icao);
-		std::string getMenuICAO() const { return menuICAO_; }
-		std::string changeMenuICAO(const std::string& newICAO) { menuICAO_ = newICAO; return menuICAO_; }
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
 		bool dumpReportToLogFile();
+		bool changeApiUrl(const std::string& newUrl);
 
     public:
         // Command IDs
         std::string versionId_;
-		std::string menuId_;
 		std::string dumpId_;
+		std::string urlId_;
 
     private:
         // Plugin state
@@ -90,10 +94,13 @@ namespace rampAgent {
         bool isConnected_ = false;
         bool m_stop;
         bool printError = true;
-		std::string menuICAO_ = "LFPG"; //default airport for menu
 		std::filesystem::path configPath_;
 		nlohmann::ordered_json lastReportJson_;
+		nlohmann::ordered_json lastOccupiedStands_;
+		std::mutex reportMutex_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
+		std::string apiUrl_ = RAMPAGENT_API;
+        std::string callsign_;
 
         // APIs
         PluginMetadata metadata_;
@@ -116,12 +123,12 @@ namespace rampAgent {
         void unegisterCommand();
         void OnTagAction(const Tag::TagActionEvent* event) override;
         void OnTagDropdownAction(const Tag::DropdownActionEvent* event) override;
-        void UpdateTagItems();
-        void UpdateTagItems(std::string Callsign, std::string standName = "N/A");
+        void UpdateTagItems(std::string Callsign, Colour colour = WHITE, std::string standName = "", std::string remark = "");
         void updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands);
 
 	    // TAG Items IDs
 		std::string standTagId_;
+		std::string remarkTagId_;
         std::string standMenuId_;
 
         // TAG Action IDs

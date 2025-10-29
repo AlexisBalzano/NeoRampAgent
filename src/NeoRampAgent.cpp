@@ -10,7 +10,7 @@
 #include "core/CompileCommands.h"
 #include "core/TagFunctions.h"
 #include "core/TagItems.h"
-#include "secret.h"
+#include "Secret.h"
 
 #ifdef DEV
 #define LOG_DEBUG(loglevel, message) logger_->log(loglevel, message)

@@ -401,7 +401,11 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 	res = cli.Get("/rampagent/api/occupancy/occupied", headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
-		printError = true; // reset error printing flag on success
+		if (!printError) {
+			printError = true; // reset error printing flag on success
+			DisplayMessage("Successfully reconnected to NeoRampAgent server.", "");
+			logger_->info("Successfully reconnected to NeoRampAgent server.");
+		}
 		try {
 			if (!res->body.empty()) assignedStandsJson["occupiedStands"] = nlohmann::ordered_json::parse(res->body);
 			return assignedStandsJson;

@@ -106,15 +106,19 @@ jobs:
       - name: Configure CMake (MacOS)
         if: matrix.os == 'macos-latest'
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
         run: |
-          cmake -S . -B build -DAUTH_SECRET="${{ secrets.AUTH_SECRET }}" -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }}
+          cmake --build build --config ${{ env.build_type }} -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }} --parallel
 
       - name: Build
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
         run: |
-          cmake --build . --config ${{ env.build_type }}
+          cmake --build build --config ${{ env.build_type }} --parallel
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

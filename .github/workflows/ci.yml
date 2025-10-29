@@ -155,7 +155,7 @@ jobs:
       - name: Organize plugin binaries for packaging
         run: |
           mkdir -p all_builds/NeoRampAgent
-          find all_builds -type f -name 'NeoRampAgent*' -exec cp {} all_builds/NeoRampAgent/ \ ;
+          find all_builds -type f -name 'NeoRampAgent*' -exec cp {} all_builds/NeoRampAgent/ \;
 
       - name: List files after organizing
         run: ls -R all_builds

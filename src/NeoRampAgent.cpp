@@ -3,11 +3,14 @@
 #include <chrono>
 #include <httplib.h>
 #include <fstream>
+#include <iomanip>
+#include <openssl/sha.h>
 
 #include "Version.h"
 #include "core/CompileCommands.h"
 #include "core/TagFunctions.h"
 #include "core/TagItems.h"
+#include "secret.h"
 
 #ifdef DEV
 #define LOG_DEBUG(loglevel, message) logger_->log(loglevel, message)
@@ -178,6 +181,7 @@ bool rampAgent::NeoRampAgent::isController()
 	if (isConnected_) {
 		if (connectionInfo->facility >= Fsd::NetworkFacility::DEL) {
 			callsign_ = connectionInfo->callsign;
+			cid_ = std::to_string(connectionInfo->cid);
 			return true;
 		}
 	}
@@ -276,6 +280,8 @@ void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
 	}
 
 	reportJson["client"] = callsign_;
+	reportJson["cid"] = cid_;
+	reportJson["token"] = generateToken(callsign_, cid_);
 	reportJson["aircrafts"]["onGround"] = nlohmann::ordered_json::object();
 	reportJson["aircrafts"]["airborne"] = nlohmann::ordered_json::object();
 
@@ -474,6 +480,19 @@ bool rampAgent::NeoRampAgent::changeApiUrl(const std::string& newUrl)
 	apiUrl_ = newUrl;
 	return true;
 }
+
+std::string rampAgent::NeoRampAgent::generateToken(const std::string& callsign, const std::string& cid)
+{
+	std::string s = AUTH_SECRET + callsign + cid;
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	SHA256(reinterpret_cast<const unsigned char*>(s.data()), s.size(), hash);
+	std::ostringstream oss;
+	oss << std::hex << std::setfill('0');
+	for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+		oss << std::setw(2) << static_cast<int>(hash[i]);
+	}
+	return oss.str();
+}	
 
 void NeoRampAgent::runScopeUpdate() {
 	std::lock_guard<std::mutex> lock(reportMutex_);

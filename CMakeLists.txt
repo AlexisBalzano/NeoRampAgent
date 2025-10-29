@@ -76,6 +76,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     PREFIX ""  # Remove "lib" prefix on Unix-like systems
 )
 
+# Link Apple frameworks required by httplib's macOS code path
+if(APPLE)
+    # Prefer explicit framework flags for portability on CI / Xcode
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework CoreFoundation" "-framework CFNetwork")
+endif()
+
 # Add processor-specific output name for Apple platforms
 if(${CMAKE_HOST_APPLE})
     set_target_properties(${PROJECT_NAME} PROPERTIES

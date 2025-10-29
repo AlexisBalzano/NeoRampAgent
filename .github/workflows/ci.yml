@@ -108,9 +108,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
         run: |
-          cmake --build build --config ${{ env.build_type }} -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }} --parallel
+          cmake -S . -B build -DAUTH_SECRET="${{ secrets.AUTH_SECRET }}" -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }}
 
       - name: Build
         shell: bash

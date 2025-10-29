@@ -119,14 +119,28 @@ jobs:
         run: |
           cmake --build build --config ${{ env.build_type }} --parallel
 
+      - name: List build outputs (debug)
+        run: |
+          echo "Workspace: $(pwd)"
+          echo "Listing repo root:"
+          ls -la
+          echo "Listing build dir:"
+          ls -la build || true
+          echo "Listing build tree:"
+          find build -maxdepth 3 -type f -name 'NeoRampAgent*' -print || true
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NeoRampAgent-${{ matrix.platform }}-${{ matrix.architecture }}
           path: |
-            lib/NeoRampAgent*
-            bin/NeoRampAgent*
-            bin/${{ env.build_type }}/NeoRampAgent*
+            build/lib/**
+            build/bin/**
+            build/*/Release/**         # accommodate multi-config MSVC / Visual Studio
+            build/*/RelWithDebInfo/**  # other config folders
+            lib/**                     # fallback (if your CMake wrote to repo root)
+            bin/**
+            **/NeoRampAgent*           # very broad fallback
 
   package:
     needs: build
@@ -151,7 +165,7 @@ jobs:
       - name: Organize plugin binaries for packaging
         run: |
           mkdir -p all_builds/NeoRampAgent
-          find all_builds -type f -name 'NeoRampAgent*' -exec cp {} all_builds/NeoRampAgent/ \;
+          find all_builds -type f -name 'NeoRampAgent*' -exec cp {} all_builds/NeoRampAgent/ \ ;
 
       - name: List files after organizing
         run: ls -R all_builds

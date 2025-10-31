@@ -79,7 +79,7 @@ namespace rampAgent {
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
 		bool dumpReportToLogFile();
 		bool changeApiUrl(const std::string& newUrl);
-        std::string generateToken(const std::string& callsign, const std::string& cid);
+        std::string generateToken(const std::string& callsign);
 
     public:
         // Command IDs
@@ -102,7 +102,6 @@ namespace rampAgent {
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 		std::string apiUrl_ = RAMPAGENT_API;
         std::string callsign_;
-		std::string cid_;
 
         // APIs
         PluginMetadata metadata_;

@@ -175,6 +175,7 @@ bool rampAgent::NeoRampAgent::isController()
 	}
 #ifdef DEV
 	callsign_ = connectionInfo->callsign;
+	cid_ = std::to_string(connectionInfo->cid);
 	return true;
 #endif // DEV
 
@@ -483,7 +484,7 @@ bool rampAgent::NeoRampAgent::changeApiUrl(const std::string& newUrl)
 
 std::string rampAgent::NeoRampAgent::generateToken(const std::string& callsign, const std::string& cid)
 {
-	std::string s = AUTH_SECRET + callsign + cid;
+	std::string s = AUTH_SECRET + cid + callsign_;
 	unsigned char hash[SHA256_DIGEST_LENGTH];
 	SHA256(reinterpret_cast<const unsigned char*>(s.data()), s.size(), hash);
 	std::ostringstream oss;

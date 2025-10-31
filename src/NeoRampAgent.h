@@ -9,7 +9,7 @@
 #include "NeoRadarSDK/SDK.h"
 #include "core/NeoRampAgentCommandProvider.h"
 
-constexpr const char* NEORAMPAGENT_VERSION = "v1.0.1";
+constexpr const char* NEORAMPAGENT_VERSION = "v1.0.2";
 constexpr const char* RAMPAGENT_API = "pintade.vatsim.fr";
 
 using namespace PluginSDK;
@@ -79,6 +79,7 @@ namespace rampAgent {
         bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
 		bool dumpReportToLogFile();
 		bool changeApiUrl(const std::string& newUrl);
+        std::string generateToken(const std::string& callsign);
 
     public:
         // Command IDs

@@ -67,10 +67,12 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 	}
 	std::string icao = fpOpt->destination;
 
+	std::string token = generateToken(callsign_);
+
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-    std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign;
+    std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign + "&token=" + token + "&client=" + callsign_;
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
 

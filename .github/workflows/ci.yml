@@ -55,16 +55,6 @@ jobs:
       - name: Get commit short SHA
         uses: benjlevesque/short-sha@v3.0
         id: short-sha
-
-      - name: Compute version
-        id: compute_version
-        shell: bash
-        run: |
-          version="${{ steps.short-sha.outputs.sha }}"
-          if [ "${{ github.ref_type }}" == "tag" ]; then
-            version=$(echo ${{ github.ref }} | sed -E 's/refs\/tags\/(v)?//g')
-          fi
-          echo "version=$version" >> $GITHUB_OUTPUT
       
       - name: Setup Ubuntu compiler
         if: matrix.os == 'ubuntu-latest'
@@ -111,29 +101,36 @@ jobs:
         if: matrix.os != 'macos-latest'
         shell: bash
         run: |
-          cmake . -DPLUGIN_VERSION=${{ steps.compute_version.outputs.version }}
+          cmake -S . -B build -DAUTH_SECRET="${{ secrets.AUTH_SECRET }}" 
 
       - name: Configure CMake (MacOS)
         if: matrix.os == 'macos-latest'
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cmake . -DPLUGIN_VERSION=${{ steps.compute_version.outputs.version }} -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }}
+          cmake -S . -B build -DAUTH_SECRET="${{ secrets.AUTH_SECRET }}" -DCMAKE_APPLE_SILICON_PROCESSOR=${{ matrix.architecture }}
 
       - name: Build
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
         run: |
-          cmake --build . --config ${{ env.build_type }}
+          cmake --build build --config ${{ env.build_type }} --parallel
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NeoRampAgent-${{ matrix.platform }}-${{ matrix.architecture }}
           path: |
-            lib/NeoRampAgent*
-            bin/NeoRampAgent*
-            bin/${{ env.build_type }}/NeoRampAgent*
+            build/lib/**
+            build/bin/**
+            build/*/Release/**        
+            build/*/RelWithDebInfo/**  
+            lib/**                     
+            bin/**
+            **/NeoRampAgent* 
 
   package:
     needs: build

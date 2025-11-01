@@ -76,6 +76,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # Link Apple frameworks required by httplib's macOS code path
 if(APPLE)
+    # Prefer explicit framework flags for portability on CI / Xcode
     target_link_libraries(${PROJECT_NAME} PRIVATE "-framework CoreFoundation" "-framework CFNetwork")
 endif()
 

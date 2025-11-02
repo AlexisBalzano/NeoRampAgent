@@ -306,9 +306,11 @@ std::string rampAgent::NeoRampAgent::generateToken(const std::string& callsign)
 }	
 
 void NeoRampAgent::runScopeUpdate() {
-	std::lock_guard<std::mutex> lock(reportMutex_);
+	std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
 
+	LOG_DEBUG(Logger::LogLevel::Info, "Running scope update for stand assignments.");
 	lastOccupiedStands_ = getAllAssignedStands();
+	LOG_DEBUG(Logger::LogLevel::Info, "Retrieved occupied stands data: " + lastOccupiedStands_.dump());
 
 	if (lastOccupiedStands_.empty()) {
 		if (printError) {
@@ -326,6 +328,8 @@ void NeoRampAgent::runScopeUpdate() {
 
 	std::map<std::string, std::string> standTagMap;
 
+	LOG_DEBUG(Logger::LogLevel::Info, "Processing assigned stands for tag updates.");
+
 	auto& assigned = lastOccupiedStands_["assignedStands"];
 	lastOccupiedStands_["assignedStands"].insert(
 		lastOccupiedStands_["assignedStands"].end(),
@@ -333,26 +337,48 @@ void NeoRampAgent::runScopeUpdate() {
 		lastOccupiedStands_["occupiedStands"].end()
 	); // display tag item on occupied stands as well
 
-	for (auto& stand : assigned) {
-		std::string callsign = stand["callsign"].get<std::string>();
-		std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);
-		if (!acOpt.has_value()) {
-			continue; // Aircraft not found, skip
-		}
+	LOG_DEBUG(Logger::LogLevel::Info, "Combined assigned and occupied stands for processing.");
 
-		std::string standName = stand["name"].get<std::string>();
-		standTagMap[callsign] = standName;
+	try {
+		for (const auto& stand : assigned) {
+			if (!stand.is_object()) continue;
 
-		std::string remark = stand.value("remark", "");
+			// callsign
+			const auto csIt = stand.find("callsign");
+			if (csIt == stand.end() || !csIt->is_string()) continue;
+			const std::string callsign = csIt->get<std::string>();
 
-		// Update only if changed or new
-		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end() && lastStandTagMap_[callsign] == standName) {
-			UpdateTagItems(callsign, WHITE, standName, remark);
-			continue;
+			// aircraft must exist on scope
+			std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);
+			if (!acOpt.has_value()) continue;
+
+			// stand name
+			const auto nameIt = stand.find("name");
+			if (nameIt == stand.end() || !nameIt->is_string()) continue;
+			const std::string standName = nameIt->get<std::string>();
+			standTagMap[callsign] = standName;
+
+			// remark: accept string only; treat null/other as empty
+			std::string remark;
+			if (auto rIt = stand.find("remark"); rIt != stand.end() && rIt->is_string()) {
+				remark = rIt->get<std::string>();
+			}
+			else {
+				remark.clear();
+			}
+
+			// Update only if changed or new
+			if (auto it = lastStandTagMap_.find(callsign);
+				it != lastStandTagMap_.end() && it->second == standName) {
+				UpdateTagItems(callsign, WHITE, standName, remark);
+			}
+			else {
+				UpdateTagItems(callsign, YELLOW, standName, remark);
+			}
 		}
-		else {
-			UpdateTagItems(callsign, YELLOW, standName, remark);
-		}
+	}
+	catch (const std::exception& e) {
+		logger_->error(std::string("runScopeUpdate: failed to process assigned stands: ") + e.what());
 	}
 
 	// Clear tags for aircraft that are no longer assigned
@@ -363,6 +389,7 @@ void NeoRampAgent::runScopeUpdate() {
 	}
 
 	lastStandTagMap_ = standTagMap;
+	LOG_DEBUG(Logger::LogLevel::Info, "Scope update completed.");
 }
 
 void rampAgent::NeoRampAgent::OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event)

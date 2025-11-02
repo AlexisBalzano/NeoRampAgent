@@ -90,7 +90,7 @@ namespace rampAgent {
         bool m_stop;
         bool printError = true;
 		nlohmann::ordered_json lastOccupiedStands_;
-		std::mutex reportMutex_;
+		std::mutex occupiedStandstMutex_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 		std::string apiUrl_ = RAMPAGENT_API;
         std::string callsign_;

@@ -90,6 +90,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
     }
     else { // assignement processed, check response to see if successful and update tag item if so
         if (!res->body.empty()) {
+			std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
             nlohmann::ordered_json dataJson = nlohmann::ordered_json::parse(res->body);
 			if (!dataJson.contains("message")) return; // malformed response
             if (dataJson["message"]["action"].get<std::string>() == "assign") {

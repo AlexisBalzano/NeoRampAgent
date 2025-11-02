@@ -18,13 +18,6 @@ void NeoRampAgent::RegisterCommand() {
 
         versionId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
 
-        definition.name = "rampAgent dump";
-        definition.description = "Dump latest report to log file";
-        definition.lastParameterHasSpaces = false;
-		definition.parameters.clear();
-
-        dumpId_ = chatAPI_->registerCommand(definition.name, definition, CommandProvider_);
-
         definition.name = "rampAgent url";
         definition.description = "Change API url";
         definition.lastParameterHasSpaces = false;
@@ -53,7 +46,6 @@ inline void NeoRampAgent::unegisterCommand()
     if (CommandProvider_)
     {
         chatAPI_->unregisterCommand(versionId_);
-        chatAPI_->unregisterCommand(dumpId_);
         chatAPI_->unregisterCommand(urlId_);
         CommandProvider_.reset();
 	}
@@ -66,18 +58,6 @@ Chat::CommandResult NeoRampAgentCommandProvider::Execute( const std::string &com
 		neoRampAgent_->DisplayMessage("Plugin Version: " + std::string(NEORAMPAGENT_VERSION), "");
         return { true, std::nullopt };
 	}
-    else if (commandId == neoRampAgent_->dumpId_)
-    {
-		bool result = neoRampAgent_->dumpReportToLogFile();
-        if (result) {
-            neoRampAgent_->DisplayMessage("Report dumped to NeoRadar/logs/plugins/NeoRampAgent.", "");
-            return { true, std::nullopt };
-        }
-        else {
-            std::string error = "Failed to dump report to log file.";
-            return { true, error };
-		}
-    }
     else if (commandId == neoRampAgent_->urlId_)
     {
 		neoRampAgent_->changeApiUrl(args[0]);

@@ -9,7 +9,7 @@
 #include "NeoRadarSDK/SDK.h"
 #include "core/NeoRampAgentCommandProvider.h"
 
-constexpr const char* NEORAMPAGENT_VERSION = "v1.0.2";
+constexpr const char* NEORAMPAGENT_VERSION = "v1.0.4";
 constexpr const char* RAMPAGENT_API = "pintade.vatsim.fr";
 
 using namespace PluginSDK;
@@ -73,35 +73,28 @@ namespace rampAgent {
 
     public:
 		std::string toUpper(std::string str);
-        void generateReport(nlohmann::ordered_json& reportJson);
-        nlohmann::ordered_json sendReport();
-        nlohmann::ordered_json getAllAssignedStands(); //used to update tags when not sending reports
-        bool printToFile(const std::vector<std::string>& lines, const std::string& fileName);
-		bool dumpReportToLogFile();
+        nlohmann::ordered_json getAllAssignedStands();
 		bool changeApiUrl(const std::string& newUrl);
         std::string generateToken(const std::string& callsign);
 
     public:
         // Command IDs
         std::string versionId_;
-		std::string dumpId_;
 		std::string urlId_;
 
     private:
         // Plugin state
         bool initialized_ = false;
         std::thread m_worker;
-		bool canSendReport_ = false;
         bool isConnected_ = false;
         bool m_stop;
         bool printError = true;
-		std::filesystem::path configPath_;
-		nlohmann::ordered_json lastReportJson_;
 		nlohmann::ordered_json lastOccupiedStands_;
-		std::mutex reportMutex_;
+		std::mutex occupiedStandstMutex_;
 		std::map<std::string, std::string> lastStandTagMap_; // maps callsign to stand tag ID
 		std::string apiUrl_ = RAMPAGENT_API;
         std::string callsign_;
+		bool isController_ = false;
 
         // APIs
         PluginMetadata metadata_;

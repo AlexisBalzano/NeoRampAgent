@@ -1,4 +1,4 @@
-# NeoRampAgent_
+# NeoRampAgent
 Ramp Agent interface for *NeoRadar* ATC Client <br>
 <br>
 
@@ -65,4 +65,3 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
 # Commands
 Available commands to interact with the plugin:
 - `.rampAgent version`: Display the current version of the plugin
-- `.rampAgent dump`: Dump latest report to log file

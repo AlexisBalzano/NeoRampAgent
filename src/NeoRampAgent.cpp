@@ -58,8 +58,7 @@ void NeoRampAgent::Initialize(const PluginMetadata& metadata, CoreAPI* coreAPI, 
 
 		initialized_ = true;
 		isConnected_ = isConnected();
-		canSendReport_ = isController();
-		configPath_ = clientInfo_.documentsPath;
+		isController_ = isController();
 		logger_->info("NeoRampAgent initialized successfully");
 	}
 	catch (const std::exception& e)
@@ -249,126 +248,6 @@ void rampAgent::NeoRampAgent::sortStandList(std::vector<Stand>& standList)
 		});
 }
 
-void rampAgent::NeoRampAgent::generateReport(nlohmann::ordered_json& reportJson)
-{
-	reportJson.clear();
-
-	// need to retrieve all aircraft in range and format json report
-	std::vector<Aircraft::Aircraft> aircrafts = aircraftAPI_->getAll();
-
-	// Filter for ground aircraft & airborn aircrafts
-	std::vector<Aircraft::Aircraft> groundAircrafts;
-	std::vector<Aircraft::Aircraft> airbornAircrafts;
-	for (const auto& ac : aircrafts) {
-		if (ac.position.groundSpeed == 0) {
-			groundAircrafts.push_back(ac);
-		}
-		else {
-			if (ac.position.altitude > 20000) continue; // Skip aircraft above 20,000 ft
-			airbornAircrafts.push_back(ac);
-		}
-	}
-
-	if (!isConnected_) {
-		if (printError) {
-			printError = false; // avoid spamming logs
-			DisplayMessage("Not connected to FSD server. Cannot send report.", "NeoRampAgent");
-			logger_->log(Logger::LogLevel::Warning, "Not connected to FSD server. Cannot send report.");
-		}
-		return;
-	}
-
-	reportJson["client"] = callsign_;
-	reportJson["token"] = generateToken(callsign_);
-	reportJson["aircrafts"]["onGround"] = nlohmann::ordered_json::object();
-	reportJson["aircrafts"]["airborne"] = nlohmann::ordered_json::object();
-
-	for (const auto& ac : groundAircrafts) {
-		std::string callsign = toUpper(ac.callsign);
-		std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
-		std::string origin = "N/A";
-		std::string aircraftType = "ZZZZ";
-		if (fp.has_value()) {
-			origin = toUpper(fp->origin);
-			aircraftType = toUpper(fp->acType);
-		}
-
-		reportJson["aircrafts"]["onGround"][callsign]["origin"] = origin;
-		reportJson["aircrafts"]["onGround"][callsign]["aircraftType"] = aircraftType;
-		reportJson["aircrafts"]["onGround"][callsign]["position"]["lat"] = ac.position.latitude;
-		reportJson["aircrafts"]["onGround"][callsign]["position"]["lon"] = ac.position.longitude;
-	}
-
-	for (const auto& ac : airbornAircrafts) {
-		std::string callsign = toUpper(ac.callsign);
-		std::optional<Flightplan::Flightplan> fp = flightplanAPI_->getByCallsign(ac.callsign);
-		if (!fp.has_value()) continue; // Skip if no flightplan found
-		if (fp->destination.substr(0, 2) != "LF") continue; // Skip if destination is not in France
-		std::string origin = "N/A";
-		std::string destination = "N/A";
-		std::string aircraftType = "ZZZZ";
-		origin = toUpper(fp->origin);
-		destination = toUpper(fp->destination);
-		aircraftType = toUpper(fp->acType);
-
-		std::optional<double> distOpt = aircraftAPI_->getDistanceToDestination(ac.callsign);
-		double dist = distOpt.value_or(-1);
-
-		reportJson["aircrafts"]["airborne"][callsign]["origin"] = origin;
-		reportJson["aircrafts"]["airborne"][callsign]["destination"] = destination;
-		reportJson["aircrafts"]["airborne"][callsign]["aircraftType"] = aircraftType;
-		reportJson["aircrafts"]["airborne"][callsign]["position"]["lat"] = ac.position.latitude;
-		reportJson["aircrafts"]["airborne"][callsign]["position"]["lon"] = ac.position.longitude;
-		reportJson["aircrafts"]["airborne"][callsign]["position"]["alt"] = ac.position.altitude;
-		reportJson["aircrafts"]["airborne"][callsign]["position"]["dist"] = dist;
-	}
-}
-
-nlohmann::ordered_json rampAgent::NeoRampAgent::sendReport()
-{
-	nlohmann::ordered_json reportJson;
-	generateReport(reportJson);
-	lastReportJson_ = reportJson; // store last report for logging/dumping
-
-	if (reportJson.empty()) {
-		logger_->log(Logger::LogLevel::Info, "Skipping report: no data to send.");
-		return nlohmann::ordered_json::object();
-	}
-
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-	httplib::SSLClient cli(apiUrl_, 443);
-	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-
-
-	auto res = cli.Post("/rampagent/api/report", reportJson.dump(), "application/json");
-
-	if (res && res->status >= 200 && res->status < 300) {
-		if (!printError) {
-			printError = true; // reset error printing flag on success
-			DisplayMessage("Successfully reconnected to NeoRampAgent server.", "");
-			logger_->info("Successfully reconnected to NeoRampAgent server.");
-		}
-		try {
-			return res->body.empty() ? nlohmann::ordered_json::object() : nlohmann::ordered_json::parse(res->body);
-		}
-		catch (const std::exception& e) {
-			logger_->error("Failed to parse response from NeoRampAgent server: " + std::string(e.what()));
-			return nlohmann::ordered_json::object();
-		}
-	}
-	else {
-		if (printError) {
-			printError = false; // avoid spamming logs
-			DisplayMessage("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0), "");
-			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
-		}
-	}
-#else
-	logger_->warning("OpenSSL not available; cannot send report to NeoRampAgent server.");
-#endif
-	return nlohmann::ordered_json::object();
-}
-
 nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 {
 	nlohmann::ordered_json assignedStandsJson = nlohmann::ordered_json::object();
@@ -377,7 +256,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 	httplib::SSLClient cli(apiUrl_, 443);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
-	auto res = cli.Get("/rampagent/api/occupancy/assigned", headers);
+	auto res = cli.Get("/rampagent/api/occupancy/", headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
 		if (!printError) {
@@ -386,91 +265,25 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 			logger_->info("Successfully reconnected to NeoRampAgent server.");
 		}
 		try {
-			if (!res->body.empty()) assignedStandsJson["assignedStands"] = nlohmann::ordered_json::parse(res->body);
+			if (!res->body.empty()) return assignedStandsJson = nlohmann::ordered_json::parse(res->body);
 		}
 		catch (const std::exception& e) {
 			logger_->error("Failed to parse assigned stands data from NeoRampAgent server: " + std::string(e.what()));
-			return nlohmann::ordered_json::object();
+			return assignedStandsJson;
 		}
 	}
 	else {
 		if (printError) {
 			printError = false; // avoid spamming logs
 			DisplayMessage("Failed to retrieve assigned stands data from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0), "");
-			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
+			logger_->error("Failed to retrieve assigned stands data from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
 		}
-		return nlohmann::ordered_json::object();
-	}
-
-	res = cli.Get("/rampagent/api/occupancy/occupied", headers);
-
-	if (res && res->status >= 200 && res->status < 300) {
-		if (!printError) {
-			printError = true; // reset error printing flag on success
-			DisplayMessage("Successfully reconnected to NeoRampAgent server.", "");
-			logger_->info("Successfully reconnected to NeoRampAgent server.");
-		}
-		try {
-			if (!res->body.empty()) assignedStandsJson["occupiedStands"] = nlohmann::ordered_json::parse(res->body);
-			return assignedStandsJson;
-		}
-		catch (const std::exception& e) {
-			logger_->error("Failed to parse occupied stands data from NeoRampAgent server: " + std::string(e.what()));
-			return nlohmann::ordered_json::object();
-		}
-	}
-	else {
-		if (printError) {
-			printError = false; // avoid spamming logs
-			DisplayMessage("Failed to retrieve occupied stands data from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0), "");
-			logger_->error("Failed to send report to NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
-		}
+		return assignedStandsJson;
 	}
 #else
 	logger_->warning("OpenSSL not available; cannot retrieve assigned stands from NeoRampAgent server.");
 #endif // #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-	return nlohmann::ordered_json::object();
-}
-
-bool rampAgent::NeoRampAgent::printToFile(const std::vector<std::string>& lines, const std::string& fileName)
-{
-	{
-		std::filesystem::path dir = configPath_ / "logs" / "plugins" / "NeoRampAgent";
-		std::error_code ec;
-		if (!std::filesystem::exists(dir))
-		{
-			if (!std::filesystem::create_directories(dir, ec))
-			{
-				logger_->log(Logger::LogLevel::Error,
-					"Failed to create log directory: " + dir.string() + " ec=" + ec.message());
-				return false;
-			}
-		}
-		std::filesystem::path filePath = dir / fileName;
-		std::ofstream outFile(filePath);
-		if (!outFile.is_open()) {
-			logger_->log(Logger::LogLevel::Error, "Could not open file to write: " + filePath.string());
-			return false;
-		}
-		for (const auto& line : lines) {
-			outFile << line << std::endl;
-		}
-		outFile.close();
-		return true;
-	}
-}
-
-bool rampAgent::NeoRampAgent::dumpReportToLogFile()
-{
-	// generate filName containing timestamp
-	std::string fileName = "report_" + std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) + ".txt";
-	std::vector<std::string> content;
-	content.push_back("--- NeoRampAgent last Report Dump ---");
-	content.push_back("Is Connected: " + std::string(isConnected_ ? "Yes" : "No"));
-	content.push_back("Can send report: " + std::string(canSendReport_ ? "Yes" : "No"));
-	content.push_back("Report:");
-	content.push_back(lastReportJson_.dump(4).empty() ? "{}" : lastReportJson_.dump(4));
-	return printToFile(content, fileName);
+	return assignedStandsJson;
 }
 
 bool rampAgent::NeoRampAgent::changeApiUrl(const std::string& newUrl)
@@ -493,10 +306,11 @@ std::string rampAgent::NeoRampAgent::generateToken(const std::string& callsign)
 }	
 
 void NeoRampAgent::runScopeUpdate() {
-	std::lock_guard<std::mutex> lock(reportMutex_);
+	std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
 
-	if (canSendReport_) lastOccupiedStands_ = sendReport(); // Use response to update tags
-	else lastOccupiedStands_ = getAllAssignedStands();
+	LOG_DEBUG(Logger::LogLevel::Info, "Running scope update for stand assignments.");
+	lastOccupiedStands_ = getAllAssignedStands();
+	LOG_DEBUG(Logger::LogLevel::Info, "Retrieved occupied stands data: " + lastOccupiedStands_.dump());
 
 	if (lastOccupiedStands_.empty()) {
 		if (printError) {
@@ -514,6 +328,8 @@ void NeoRampAgent::runScopeUpdate() {
 
 	std::map<std::string, std::string> standTagMap;
 
+	LOG_DEBUG(Logger::LogLevel::Info, "Processing assigned stands for tag updates.");
+
 	auto& assigned = lastOccupiedStands_["assignedStands"];
 	lastOccupiedStands_["assignedStands"].insert(
 		lastOccupiedStands_["assignedStands"].end(),
@@ -521,26 +337,48 @@ void NeoRampAgent::runScopeUpdate() {
 		lastOccupiedStands_["occupiedStands"].end()
 	); // display tag item on occupied stands as well
 
-	for (auto& stand : assigned) {
-		std::string callsign = stand["callsign"].get<std::string>();
-		std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);
-		if (!acOpt.has_value()) {
-			continue; // Aircraft not found, skip
-		}
+	LOG_DEBUG(Logger::LogLevel::Info, "Combined assigned and occupied stands for processing.");
 
-		std::string standName = stand["name"].get<std::string>();
-		standTagMap[callsign] = standName;
+	try {
+		for (const auto& stand : assigned) {
+			if (!stand.is_object()) continue;
 
-		std::string remark = stand.value("remark", "");
+			// callsign
+			const auto csIt = stand.find("callsign");
+			if (csIt == stand.end() || !csIt->is_string()) continue;
+			const std::string callsign = csIt->get<std::string>();
 
-		// Update only if changed or new
-		if (lastStandTagMap_.find(callsign) != lastStandTagMap_.end() && lastStandTagMap_[callsign] == standName) {
-			UpdateTagItems(callsign, WHITE, standName, remark);
-			continue;
+			// aircraft must exist on scope
+			std::optional<Aircraft::Aircraft> acOpt = aircraftAPI_->getByCallsign(callsign);
+			if (!acOpt.has_value()) continue;
+
+			// stand name
+			const auto nameIt = stand.find("name");
+			if (nameIt == stand.end() || !nameIt->is_string()) continue;
+			const std::string standName = nameIt->get<std::string>();
+			standTagMap[callsign] = standName;
+
+			// remark: accept string only; treat null/other as empty
+			std::string remark;
+			if (auto rIt = stand.find("remark"); rIt != stand.end() && rIt->is_string()) {
+				remark = rIt->get<std::string>();
+			}
+			else {
+				remark.clear();
+			}
+
+			// Update only if changed or new
+			if (auto it = lastStandTagMap_.find(callsign);
+				it != lastStandTagMap_.end() && it->second == standName) {
+				UpdateTagItems(callsign, WHITE, standName, remark);
+			}
+			else {
+				UpdateTagItems(callsign, YELLOW, standName, remark);
+			}
 		}
-		else {
-			UpdateTagItems(callsign, YELLOW, standName, remark);
-		}
+	}
+	catch (const std::exception& e) {
+		logger_->error(std::string("runScopeUpdate: failed to process assigned stands: ") + e.what());
 	}
 
 	// Clear tags for aircraft that are no longer assigned
@@ -551,17 +389,18 @@ void NeoRampAgent::runScopeUpdate() {
 	}
 
 	lastStandTagMap_ = standTagMap;
+	LOG_DEBUG(Logger::LogLevel::Info, "Scope update completed.");
 }
 
 void rampAgent::NeoRampAgent::OnFsdConnectionStateChange(const Fsd::FsdConnectionStateChangeEvent* event)
 {
 	// recheck connection status to determine if we can send reports
 	isConnected_ = isConnected();
-	canSendReport_ = isController();
+	isController_ = isController();
 }
 
 void NeoRampAgent::OnTimer(int Counter) {
-	if (Counter % 10 == 0 && isConnected_) this->runScopeUpdate();
+	if (Counter % 15 == 0 && isConnected_) this->runScopeUpdate();
 }
 
 PluginSDK::PluginMetadata NeoRampAgent::GetMetadata() const

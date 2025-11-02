@@ -50,15 +50,23 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
         return;
     }
 
-    if (canSendReport_ == false || isConnected_ == false) {
+    if (isController_ == false || isConnected_ == false) {
         logger_->warning("Ignoring manual stand assignment - not connected as controller.");
         return;
 	}
 
-	logger_->info("Trying to manually assign: " + event->componentId + " to: " + event->callsign);
 
 
-   	std::string standName = event->componentId;
+   	std::string standName;
+    if (event->componentId == "ENTERED") {
+		standName = event->userInput.value_or("");
+		std::transform(standName.begin(), standName.end(), standName.begin(), ::toupper);
+    }
+    else {
+		standName = event->componentId;
+    }
+
+	logger_->info("Trying to manually assign: " + standName + " to: " + event->callsign);
     
 	std::optional<Flightplan::Flightplan> fpOpt = flightplanAPI_->getByCallsign(event->callsign);
 	if (!fpOpt) {
@@ -82,6 +90,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
     }
     else { // assignement processed, check response to see if successful and update tag item if so
         if (!res->body.empty()) {
+			std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
             nlohmann::ordered_json dataJson = nlohmann::ordered_json::parse(res->body);
 			if (!dataJson.contains("message")) return; // malformed response
             if (dataJson["message"]["action"].get<std::string>() == "assign") {
@@ -113,10 +122,11 @@ void NeoRampAgent::TagProcessing(const std::string &callsign, const std::string 
 
 inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const nlohmann::ordered_json& occupiedStands)
 {
-    if (canSendReport_ == false || isConnected_ == false) {
-		return;
-	}
-	nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
+    if (isController_ == false || isConnected_ == false) {
+        return;
+    }
+
+    nlohmann::ordered_json standsJson = nlohmann::ordered_json::object();
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
@@ -142,78 +152,132 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         if (printError) {
             printError = false; // avoid spamming logs
             logger_->error("Failed to get stands information from NeoRampAgent server. HTTP status: " + std::to_string(res ? res->status : 0));
-		}
+        }
     }
+#else
+    logger_->error("Cannot update stand menu - HTTP client not supported (OpenSSL required).");
+    return;
+#endif // CPPHTTPLIB_OPENSSL_SUPPORT
 
-    if (standsJson.empty()) {
+    // If standsJson is missing or not an object, publish a minimal dropdown and return safely
+    if (!standsJson.is_object() || standsJson.empty() || occupiedStands.empty()) {
+        PluginSDK::Tag::DropdownDefinition dropdownDef;
+        dropdownDef.title = "STAND";
+        dropdownDef.width = 75;
+        dropdownDef.maxHeight = 200;
+
+        // Divider
+        PluginSDK::Tag::DropdownComponent divider;
+        divider.id = "DIVIDER";
+        divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
+
+        PluginSDK::Tag::DropdownComponent dropdownComponent;
+        PluginSDK::Tag::DropdownComponentStyle style;
+        style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
+
+        dropdownComponent.id = "None";
+        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+        dropdownComponent.text = "None";
+        dropdownComponent.requiresInput = false;
+        dropdownComponent.style = style;
+        dropdownDef.components.push_back(dropdownComponent);
+
+        dropdownDef.components.push_back(divider);
+
+        // Manual entry
+        dropdownComponent.id = "ENTERED";
+        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::InputArea;
+        dropdownComponent.text = "Enter";
+        dropdownComponent.requiresInput = true;
+        style.border = true;
+        style.backgroundColor = std::array<unsigned int, 3>{ 47, 53, 57 }; // Darker grey
+        dropdownComponent.style = style;
+        dropdownDef.components.push_back(dropdownComponent);
+
+        tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
+
         if (printError) {
             printError = false; // avoid spamming logs
             logger_->error("No stands data received from NeoRampAgent server for airport " + icao);
         }
-	}
-#else
-    logger_->error("Cannot update stand menu - HTTP client not supported (OpenSSL required).");
-	return;
-#endif // CPPHTTPLIB_OPENSSL_SUPPORT
+        return;
+    }
 
-	// deduct available stands list from all stands + occupied stands + blocked stands
     std::vector<Stand> availableStands;
+
+    const auto itAssigned = occupiedStands.find("assignedStands");
+    const auto itOccupied = occupiedStands.find("occupiedStands");
+    const auto itBlocked  = occupiedStands.find("blockedStands");
+
     for (auto& [standName, standData] : standsJson.items()) {
         Stand stand;
         stand.name = standName;
         stand.occupied = false;
 
-        // Check if stand is already Assigned
-        for (const auto& occupied : occupiedStands["assignedStands"]) {
-            if (occupied["name"].get<std::string>() == stand.name) {
-                stand.occupied = true;
-                break;
+        // Assigned
+        if (itAssigned != occupiedStands.end() && itAssigned->is_array()) {
+            for (const auto& occ : *itAssigned) {
+                const std::string occName = occ.value("name", "");
+                if (!occName.empty() && occName == stand.name) { stand.occupied = true; break; }
             }
         }
-        // Check if stand is already occupied
-        for (const auto& occupied : occupiedStands["occupiedStands"]) {
-            if (occupied["name"].get<std::string>() == stand.name) {
-                stand.occupied = true;
-                break;
+        if (stand.occupied) { continue; }
+
+        // Currently occupied
+        if (itOccupied != occupiedStands.end() && itOccupied->is_array()) {
+            for (const auto& occ : *itOccupied) {
+                const std::string occName = occ.value("name", "");
+                if (!occName.empty() && occName == stand.name) { stand.occupied = true; break; }
             }
         }
-		// Check if stand is blocked
-        for (const auto& occupied : occupiedStands["blockedStands"]) {
-            if (occupied["name"].get<std::string>() == stand.name) {
-                stand.occupied = true;
-                break;
+        if (stand.occupied) { continue; }
+
+        // Blocked
+        if (itBlocked != occupiedStands.end() && itBlocked->is_array()) {
+            for (const auto& occ : *itBlocked) {
+                const std::string occName = occ.value("name", "");
+                if (!occName.empty() && occName == stand.name) { stand.occupied = true; break; }
             }
         }
+
         if (!stand.occupied) {
             availableStands.push_back(stand);
         }
-	}
+    }
 
-	//Sort stands alphabetically -> 2A,2B, 3A,3B,...
-	sortStandList(availableStands);
+    // Sort stands alphabetically -> 2A,2B, 3A,3B,...
+    sortStandList(availableStands);
 
     PluginSDK::Tag::DropdownDefinition dropdownDef;
     dropdownDef.title = "STAND";
     dropdownDef.width = 75;
-    dropdownDef.maxHeight = 150;
-
-    PluginSDK::Tag::DropdownComponent scrollArea;
-    scrollArea.id = "SCROLL";
-    scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
-
+    dropdownDef.maxHeight = 200;
 
     PluginSDK::Tag::DropdownComponent dropdownComponent;
     PluginSDK::Tag::DropdownComponentStyle style;
-
     style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
+    // Divider
+    PluginSDK::Tag::DropdownComponent divider;
+    divider.id = "DIVIDER";
+    PluginSDK::Tag::DropdownComponentStyle dividerStyle;
+    dividerStyle.height = 10;
+    divider.style = dividerStyle;
+    divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
+
+    // "None" button
     dropdownComponent.id = "None";
     dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
     dropdownComponent.text = "None";
     dropdownComponent.requiresInput = false;
     dropdownComponent.style = style;
-    scrollArea.children.push_back(dropdownComponent);
+    dropdownDef.components.push_back(dropdownComponent);
+    dropdownDef.components.push_back(divider);
 
+    // Scroll area with available stands
+    PluginSDK::Tag::DropdownComponent scrollArea;
+    scrollArea.id = "SCROLL";
+    scrollArea.type = PluginSDK::Tag::DropdownComponentType::ScrollArea;
 
     for (const auto& stand : availableStands) {
         dropdownComponent.id = stand.name;
@@ -225,6 +289,17 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     }
 
     dropdownDef.components.push_back(scrollArea);
+    dropdownDef.components.push_back(divider);
+
+    // Manual entry
+    dropdownComponent.id = "ENTERED";
+    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::InputArea;
+    dropdownComponent.text = "Enter";
+    dropdownComponent.requiresInput = true;
+    style.border = true;
+    style.backgroundColor = std::array<unsigned int, 3>{ 47, 53, 57 }; // Darker grey
+    dropdownComponent.style = style;
+    dropdownDef.components.push_back(dropdownComponent);
 
     tagInterface_->UpdateActionDropdown(standMenuId_, dropdownDef);
 }
@@ -240,7 +315,7 @@ bool NeoRampAgent::OnTagShowDropdown(const std::string& actionId, const std::str
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(reportMutex_);
+    std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
     updateStandMenuButtons(fpOpt->destination, lastOccupiedStands_);
     return true;
 }

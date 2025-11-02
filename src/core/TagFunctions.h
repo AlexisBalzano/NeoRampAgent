@@ -166,6 +166,11 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         dropdownDef.width = 75;
         dropdownDef.maxHeight = 200;
 
+        // Divider
+        PluginSDK::Tag::DropdownComponent divider;
+        divider.id = "DIVIDER";
+        divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
+
         PluginSDK::Tag::DropdownComponent dropdownComponent;
         PluginSDK::Tag::DropdownComponentStyle style;
         style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
@@ -177,18 +182,11 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
         dropdownComponent.style = style;
         dropdownDef.components.push_back(dropdownComponent);
 
-        // Divider
-        PluginSDK::Tag::DropdownComponent divider;
-        divider.id = "DIVIDER";
-        PluginSDK::Tag::DropdownComponentStyle dividerStyle;
-        dividerStyle.backgroundColor = std::array<unsigned int, 3>{ 84, 97, 103 }; // usual menu color
-        divider.style = dividerStyle;
-        divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
         dropdownDef.components.push_back(divider);
 
         // Manual entry
         dropdownComponent.id = "ENTERED";
-        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+        dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::InputArea;
         dropdownComponent.text = "Enter";
         dropdownComponent.requiresInput = true;
         style.border = true;
@@ -259,6 +257,14 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     PluginSDK::Tag::DropdownComponentStyle style;
     style.textAlign = PluginSDK::Tag::DropdownAlignmentType::Center;
 
+    // Divider
+    PluginSDK::Tag::DropdownComponent divider;
+    divider.id = "DIVIDER";
+    PluginSDK::Tag::DropdownComponentStyle dividerStyle;
+    dividerStyle.height = 10;
+    divider.style = dividerStyle;
+    divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
+
     // "None" button
     dropdownComponent.id = "None";
     dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
@@ -266,6 +272,7 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     dropdownComponent.requiresInput = false;
     dropdownComponent.style = style;
     dropdownDef.components.push_back(dropdownComponent);
+    dropdownDef.components.push_back(divider);
 
     // Scroll area with available stands
     PluginSDK::Tag::DropdownComponent scrollArea;
@@ -282,23 +289,15 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
     }
 
     dropdownDef.components.push_back(scrollArea);
-
-    // Divider
-	PluginSDK::Tag::DropdownComponent divider;
-	divider.id = "DIVIDER";
-    PluginSDK::Tag::DropdownComponentStyle dividerStyle;
-    dividerStyle.backgroundColor = std::array<unsigned int, 3>{ 84, 97, 103 }; // usual menu color
-	divider.style = dividerStyle;
-	divider.type = PluginSDK::Tag::DropdownComponentType::Divider;
-	dropdownDef.components.push_back(divider);
+    dropdownDef.components.push_back(divider);
 
     // Manual entry
     dropdownComponent.id = "ENTERED";
-    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::Button;
+    dropdownComponent.type = PluginSDK::Tag::DropdownComponentType::InputArea;
     dropdownComponent.text = "Enter";
     dropdownComponent.requiresInput = true;
-	style.border = true;
-	style.backgroundColor = std::array<unsigned int, 3>{ 47, 53, 57 }; // Darker grey
+    style.border = true;
+    style.backgroundColor = std::array<unsigned int, 3>{ 47, 53, 57 }; // Darker grey
     dropdownComponent.style = style;
     dropdownDef.components.push_back(dropdownComponent);
 
@@ -316,7 +315,7 @@ bool NeoRampAgent::OnTagShowDropdown(const std::string& actionId, const std::str
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(reportMutex_);
+    std::lock_guard<std::mutex> lock(occupiedStandstMutex_);
     updateStandMenuButtons(fpOpt->destination, lastOccupiedStands_);
     return true;
 }

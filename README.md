@@ -10,7 +10,7 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
 # Configuration
 - Navigate to `Documents/NeoRadar/packages/LFXX/systems/`
 - Add to `list.yaml`:
-    ```yaml
+```yaml
 - name: ARRIVALS
   style:
     background:
@@ -47,7 +47,7 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
   {
     "itemName": "plugin:NeoRampAgent:TAG_STAND"
   }
-  ```
+```
    - add to departure detailled:
   ```json
   {

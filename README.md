@@ -11,7 +11,7 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
 - Navigate to `Documents/NeoRadar/packages/LFXX/systems/`
 - Add to `list.yaml`:
     ```yaml
-    - name: ARRIVALS
+- name: ARRIVALS
   style:
     background:
       bodyOpacity: 0
@@ -19,27 +19,27 @@ Ramp Agent interface for *NeoRadar* ATC Client <br>
       bodyBlur: true
       headerBlur: true
       rowColor: ["=focusedAircraft"]
-    headerTextSize: 10
-    headerOnlyBorder: true
+      headerTextSize: 10
+      headerOnlyBorder: true
   filterExpressions:
     ["AND", ["$isArr"]]
   columns:
-    - name: stand
-      width: 40
-      tagItem:
-        itemName: plugin:NeoRampAgent:TAG_STAND
-        leftClick: plugin:NeoRampAgent:ACTION_StandMenu
-    - name: c/s
-      width: 75
-      tagItem:
-        itemName: callsign
-        color: |
-          =colourInboundTransfer
-          =colourOutboundTransfer
-          =colourAssumed
-          =colourConcerned
-          =colourUnconcerned
-        leftClick: callsignMenu
+  - name: stand
+    width: 40
+    tagItem:
+      itemName: plugin:NeoRampAgent:TAG_STAND
+      leftClick: plugin:NeoRampAgent:ACTION_StandMenu
+  - name: c/s
+    width: 75
+    tagItem:
+      itemName: callsign
+      color: |
+        =colourInboundTransfer
+        =colourOutboundTransfer
+        =colourAssumed
+        =colourConcerned
+        =colourUnconcerned
+      leftClick: callsignMenu
     ```
 - And for every `label.json` inside the subfolders of systems:
     - add to arrival:

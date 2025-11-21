@@ -80,7 +80,7 @@ void NeoRampAgent::OnTagDropdownAction(const PluginSDK::Tag::DropdownActionEvent
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-    std::string apiEndpoint = "/rampagent/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign + "&token=" + token + "&client=" + callsign_;
+    std::string apiEndpoint = "/api/assign?stand=" + standName + "&icao=" + icao + "&callsign=" + event->callsign + "&token=" + token + "&client=" + callsign_;
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
 
@@ -131,7 +131,7 @@ inline void NeoRampAgent::updateStandMenuButtons(const std::string& icao, const 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     httplib::SSLClient cli(apiUrl_);
     httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
-    std::string apiEndpoint = "/rampagent/api/airports/" + icao + "/stands";
+    std::string apiEndpoint = "/api/airports/" + icao + "/stands";
 
     auto res = cli.Get(apiEndpoint.c_str(), headers);
 

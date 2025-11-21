@@ -256,7 +256,7 @@ nlohmann::ordered_json rampAgent::NeoRampAgent::getAllAssignedStands()
 	httplib::SSLClient cli(apiUrl_, 443);
 	httplib::Headers headers = { {"User-Agent", "NeoRampAgent"} };
 
-	auto res = cli.Get("/rampagent/api/occupancy/", headers);
+	auto res = cli.Get("/api/occupancy/?callsign=" + callsign_, headers);
 
 	if (res && res->status >= 200 && res->status < 300) {
 		if (!printError) {
